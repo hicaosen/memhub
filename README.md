@@ -18,30 +18,34 @@ MemHub stores decisions, preferences, and reusable knowledge as plain Markdown f
 ## Features
 
 - Markdown-based memory storage (`.md`)
-- YAML Front Matter metadata (`id`, `tags`, `category`, `importance`, timestamps)
-- CRUD operations for memory entries
-- Filtering, pagination, and full-text search
-- Category/tag aggregation
+- YAML Front Matter metadata (`id`, `session_id`, `entry_type`, `tags`, `category`, `importance`, timestamps)
+- STM-first 2-tool interface: `memory_load` + `memory_update`
+- Concurrent CLI-safe storage layout: `YYYY-MM-DD/session_uuid/...`
 - MCP stdio server compatible with MCP clients
 
 ---
 
 ## Quick Start
 
-### 1) Install dependencies
+### 1) Install from npm
+
+```bash
+npm i @synth-coder/memhub
+```
+
+### 2) Or install dependencies for local development
 
 ```bash
 npm install
 ```
 
-### 2) Build
+### 3) Build
 
 ```bash
 npm run build
 ```
 
-### 3) Run quality gate
-
+### 4) Run quality gate
 ```bash
 npm run quality
 ```
@@ -162,7 +166,7 @@ memhub/
 - [x] Quality gate (lint/typecheck/test/coverage)
 - [ ] Integration tests
 - [ ] Performance improvements
-- [ ] npm release
+- [x] npm release (`@synth-coder/memhub@0.1.0`)
 
 ---
 

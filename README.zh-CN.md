@@ -18,30 +18,34 @@ MemHub 将“用户决策、长期偏好、可复用知识”保存为 **Markdow
 ## 核心特性
 
 - Markdown 持久化（`.md`）
-- YAML Front Matter 元数据（`id / tags / category / importance / 时间戳`）
-- 记忆条目的增删改查（CRUD）
-- 支持过滤、分页、全文检索
-- 分类/标签聚合能力
+- YAML Front Matter 元数据（`id / session_id / entry_type / tags / category / importance / 时间戳`）
+- STM-first 双工具接口：`memory_load` + `memory_update`
+- 并发 CLI 安全目录：`YYYY-MM-DD/session_uuid/...`
 - MCP stdio server，可接入主流 MCP 客户端
 
 ---
 
 ## 快速开始
 
-### 1）安装依赖
+### 1）从 npm 安装
+
+```bash
+npm i @synth-coder/memhub
+```
+
+### 2）本地开发安装依赖
 
 ```bash
 npm install
 ```
 
-### 2）构建
+### 3）构建
 
 ```bash
 npm run build
 ```
 
-### 3）执行质量门禁
-
+### 4）执行质量门禁
 ```bash
 npm run quality
 ```
@@ -160,7 +164,7 @@ memhub/
 - [x] 质量门禁（lint/typecheck/test/coverage）
 - [ ] 集成测试
 - [ ] 性能优化
-- [ ] npm 发布
+- [x] npm 发布（`@synth-coder/memhub@0.1.0`）
 
 ---
 
