@@ -72,7 +72,7 @@ Example MCP client config:
       "command": "npx",
       "args": ["-y", "@synth-coder/memhub"],
       "env": {
-        "MEMHUB_STORAGE_PATH": "/absolute/path/to/memories",
+        "MEMHUB_STORAGE_PATH": "/absolute/path/to/.memhub",
         "MEMHUB_LOG_LEVEL": "info"
       }
     }
@@ -97,7 +97,7 @@ Example MCP client config:
 
 ## Environment Variables
 
-- `MEMHUB_STORAGE_PATH` (default: `./memories`)
+- `MEMHUB_STORAGE_PATH` (default: `~/.memhub`)
 - `MEMHUB_LOG_LEVEL` (default: `info`, options: `debug|info|warn|error`)
 
 ---

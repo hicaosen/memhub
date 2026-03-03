@@ -97,7 +97,7 @@ npx -y @synth-coder/memhub
 
 ## 环境变量
 
-- `MEMHUB_STORAGE_PATH`：记忆存储目录（默认：`./memories`）
+- `MEMHUB_STORAGE_PATH`：记忆存储目录（默认：`~/.memhub`）
 - `MEMHUB_LOG_LEVEL`：日志级别（默认：`info`，可选：`debug|info|warn|error`）
 
 ---

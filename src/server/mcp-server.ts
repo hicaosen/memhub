@@ -7,6 +7,7 @@
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { homedir } from 'os';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -37,7 +38,8 @@ const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as Packag
  * Create McpServer instance using SDK
  */
 export function createMcpServer(): Server {
-  const storagePath = process.env.MEMHUB_STORAGE_PATH || './memories';
+  const defaultStoragePath = join(homedir(), '.memhub');
+  const storagePath = process.env.MEMHUB_STORAGE_PATH || defaultStoragePath;
   const memoryService = new MemoryService({ storagePath });
 
   // Create server using SDK
