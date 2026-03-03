@@ -13,6 +13,11 @@ import type { Memory } from '../contracts/types.js';
 
 const TABLE_NAME = 'memories';
 
+/** Escape single quotes in id strings to prevent SQL injection */
+function escapeId(id: string): string {
+    return id.replace(/'/g, "''");
+}
+
 /**
  * Row stored in the LanceDB table.
  * The `vector` field is the only one required by LanceDB; all others are metadata filters.
@@ -83,6 +88,8 @@ export class VectorIndex {
                 createdAt: '',
                 updatedAt: '',
             };
+            // LanceDB expects Record<string, unknown>[] but our VectorRow is typed more strictly
+            // Cast is safe here as VectorRow is a subset of Record<string, unknown>
             this.table = await this.db.createTable(TABLE_NAME, [dummy as unknown as Record<string, unknown>]);
             await this.table.delete(`id = '__init__'`);
         }
@@ -97,7 +104,7 @@ export class VectorIndex {
         const table = this.table!;
 
         // Remove existing row (if any)
-        await table.delete(`id = '${memory.id}'`);
+        await table.delete(`id = '${escapeId(memory.id)}'`);
 
         const row: VectorRow = {
             id: memory.id,
@@ -110,6 +117,7 @@ export class VectorIndex {
             updatedAt: memory.updatedAt,
         };
 
+        // LanceDB expects Record<string, unknown>[] but our VectorRow is typed more strictly
         await table.add([row as unknown as Record<string, unknown>]);
     }
 
@@ -118,7 +126,7 @@ export class VectorIndex {
      */
     async delete(id: string): Promise<void> {
         await this.initialize();
-        await this.table!.delete(`id = '${id}'`);
+        await this.table!.delete(`id = '${escapeId(id)}'`);
     }
 
     /**

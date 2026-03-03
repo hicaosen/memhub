@@ -104,7 +104,10 @@ export class EmbeddingService {
         return this.embed(`${title} ${content}`.trim());
     }
 
-    /** Reset the singleton (for testing purposes only). */
+    /**
+     * Reset the singleton instance.
+     * @internal For testing purposes only. Do not use in production code.
+     */
     static _reset(): void {
         EmbeddingService.instance = null;
     }

@@ -109,4 +109,45 @@ describe('VectorIndex', () => {
         expect(results[0]._distance).toBeDefined();
         expect(typeof results[0]._distance).toBe('number');
     });
+
+    it('should handle id with single quotes (SQL injection prevention)', async () => {
+        const maliciousId = "test-' OR '1'='1";
+        const memory = makeMemory({ id: maliciousId });
+        await index.upsert(memory, randomVec());
+        expect(await index.count()).toBe(1);
+
+        // Should be able to delete by the same id
+        await index.delete(maliciousId);
+        expect(await index.count()).toBe(0);
+    });
+
+    it('should handle id with special characters', async () => {
+        const specialId = "id-with-'quotes'-and-more";
+        const memory = makeMemory({ id: specialId });
+        await index.upsert(memory, randomVec());
+        expect(await index.count()).toBe(1);
+
+        await index.delete(specialId);
+        expect(await index.count()).toBe(0);
+    });
+
+    // Error scenario tests
+    it('should allow concurrent initialization calls', async () => {
+        // Multiple concurrent init calls should not cause issues
+        const promises = [
+            index.initialize(),
+            index.initialize(),
+            index.initialize(),
+        ];
+        await expect(Promise.all(promises)).resolves.not.toThrow();
+    });
+
+    it('should persist data across instances', async () => {
+        const memory = makeMemory({ id: 'persistent-id' });
+        await index.upsert(memory, randomVec());
+
+        // Create a new instance pointing to the same directory
+        const newIndex = new VectorIndex(tempDir);
+        expect(await newIndex.count()).toBe(1);
+    });
 });
