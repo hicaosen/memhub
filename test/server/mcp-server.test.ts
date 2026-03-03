@@ -1,26 +1,33 @@
 /**
  * MCP Server Tests
- * Tests for the McpServer class
+ * Tests for the MCP Server using @modelcontextprotocol/sdk
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { McpServer } from '../../src/server/mcp-server.js';
+import { mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { createMcpServer } from '../../src/server/mcp-server.js';
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
   TOOL_DEFINITIONS,
   SERVER_INFO,
   ERROR_CODES,
   MCP_PROTOCOL_VERSION,
 } from '../../src/contracts/mcp.js';
-import { mkdtempSync, rmSync } from 'fs';
-import { tmpdir } from 'os';
-import { join } from 'path';
+import { MemoryService } from '../../src/services/memory-service.js';
+import { MemoryLoadInputSchema, MemoryUpdateInputV2Schema } from '../../src/contracts/schemas.js';
 
-describe('McpServer', () => {
+describe('McpServer (SDK)', () => {
   let tempDir: string;
+  let server: Server;
+  let memoryService: MemoryService;
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'memhub-server-test-'));
     process.env.MEMHUB_STORAGE_PATH = tempDir;
+    server = createMcpServer();
+    memoryService = new MemoryService({ storagePath: tempDir });
   });
 
   afterEach(() => {
@@ -28,10 +35,10 @@ describe('McpServer', () => {
     delete process.env.MEMHUB_STORAGE_PATH;
   });
 
-  describe('constructor', () => {
+  describe('createMcpServer', () => {
     it('should create server instance', () => {
-      const server = new McpServer();
       expect(server).toBeDefined();
+      expect(server).toBeInstanceOf(Server);
     });
   });
 
@@ -92,6 +99,69 @@ describe('McpServer', () => {
   describe('Protocol', () => {
     it('should have correct protocol version', () => {
       expect(MCP_PROTOCOL_VERSION).toBe('2024-11-05');
+    });
+  });
+
+  describe('Tool Integration Tests', () => {
+    it('should handle memory_update via MemoryService', async () => {
+      const input = MemoryUpdateInputV2Schema.parse({
+        sessionId: '550e8400-e29b-41d4-a716-446655440000',
+        entryType: 'decision',
+        title: 'Test decision',
+        content: 'This is a test decision',
+        tags: ['test'],
+        category: 'general',
+      });
+
+      const result = await memoryService.memoryUpdate(input);
+      
+      expect(result).toHaveProperty('id');
+      expect(result).toHaveProperty('sessionId');
+      expect(result.sessionId).toBe('550e8400-e29b-41d4-a716-446655440000');
+      expect(result.created).toBe(true);
+    });
+
+    it('should handle memory_load via MemoryService', async () => {
+      // First create a memory
+      const updateInput = MemoryUpdateInputV2Schema.parse({
+        sessionId: '550e8400-e29b-41d4-a716-446655440001',
+        entryType: 'preference',
+        title: 'Test preference',
+        content: 'I prefer chocolate ice cream',
+        tags: ['food', 'preference'],
+        category: 'personal',
+      });
+
+      const updateResult = await memoryService.memoryUpdate(updateInput);
+      
+      // Then load it
+      const loadInput = MemoryLoadInputSchema.parse({
+        id: updateResult.id,
+      });
+
+      const loadResult = await memoryService.memoryLoad(loadInput);
+      
+      expect(loadResult).toHaveProperty('items');
+      expect(loadResult.items.length).toBeGreaterThan(0);
+      expect(loadResult.items[0].title).toBe('Test preference');
+    });
+
+    it('should return error for invalid tool arguments', () => {
+      expect(() => {
+        MemoryUpdateInputV2Schema.parse({ title: '' }); // content is required
+      }).toThrow();
+    });
+
+    it('should validate memory_load input schema', () => {
+      const validInput = MemoryLoadInputSchema.parse({
+        sessionId: '550e8400-e29b-41d4-a716-446655440002',
+        limit: 10,
+        scope: 'stm',
+      });
+      
+      expect(validInput.sessionId).toBe('550e8400-e29b-41d4-a716-446655440002');
+      expect(validInput.limit).toBe(10);
+      expect(validInput.scope).toBe('stm');
     });
   });
 });
