@@ -54,14 +54,22 @@ npm run quality
 
 ## 作为 MCP Server 使用（stdio）
 
+### 方式 A：npx 直接运行（推荐）
+
+```bash
+npx -y @synth-coder/memhub
+```
+
+> Windows 下不要在包名后再加 `memhub` 参数。
+
 在你的 MCP 客户端配置中添加：
 
 ```json
 {
   "mcpServers": {
     "memhub": {
-      "command": "node",
-      "args": ["dist/server/mcp-server.js"],
+      "command": "npx",
+      "args": ["-y", "@synth-coder/memhub"],
       "env": {
         "MEMHUB_STORAGE_PATH": "/绝对路径/你的记忆目录",
         "MEMHUB_LOG_LEVEL": "info"
@@ -71,7 +79,18 @@ npm run quality
 }
 ```
 
-> 若后续发布到 npm 并全局安装，也可以改为通过包的 bin 入口启动。
+### 方式 B：本地仓库运行
+
+```json
+{
+  "mcpServers": {
+    "memhub": {
+      "command": "node",
+      "args": ["dist/src/server/mcp-server.js"]
+    }
+  }
+}
+```
 
 ---
 
@@ -164,7 +183,7 @@ memhub/
 - [x] 质量门禁（lint/typecheck/test/coverage）
 - [ ] 集成测试
 - [ ] 性能优化
-- [x] npm 发布（`@synth-coder/memhub@0.1.0`）
+- [x] npm 发布（`@synth-coder/memhub@0.1.1`）
 
 ---
 

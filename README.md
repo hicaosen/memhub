@@ -54,14 +54,22 @@ npm run quality
 
 ## Use as MCP Server (stdio)
 
+### Option A: run directly via npx (recommended)
+
+```bash
+npx -y @synth-coder/memhub
+```
+
+> On Windows, do **not** append `memhub` after the package name.
+
 Example MCP client config:
 
 ```json
 {
   "mcpServers": {
     "memhub": {
-      "command": "node",
-      "args": ["dist/server/mcp-server.js"],
+      "command": "npx",
+      "args": ["-y", "@synth-coder/memhub"],
       "env": {
         "MEMHUB_STORAGE_PATH": "/absolute/path/to/memories",
         "MEMHUB_LOG_LEVEL": "info"
@@ -71,7 +79,18 @@ Example MCP client config:
 }
 ```
 
-> If you publish to npm and install globally, you can also run through your package bin entry.
+### Option B: local repo run
+
+```json
+{
+  "mcpServers": {
+    "memhub": {
+      "command": "node",
+      "args": ["dist/src/server/mcp-server.js"]
+    }
+  }
+}
+```
 
 ---
 
@@ -166,7 +185,7 @@ memhub/
 - [x] Quality gate (lint/typecheck/test/coverage)
 - [ ] Integration tests
 - [ ] Performance improvements
-- [x] npm release (`@synth-coder/memhub@0.1.0`)
+- [x] npm release (`@synth-coder/memhub@0.1.1`)
 
 ---
 

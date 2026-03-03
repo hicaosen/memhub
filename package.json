@@ -1,12 +1,12 @@
 {
   "name": "@synth-coder/memhub",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A Git-friendly memory hub using Markdown-based storage with YAML Front Matter",
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
   "bin": {
-    "memhub": "dist/server/mcp-server.js"
+    "memhub": "dist/src/server/mcp-server.js"
   },
   "scripts": {
     "build": "tsc",
