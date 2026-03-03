@@ -61,6 +61,7 @@ npx -y @synth-coder/memhub
 ```
 
 > On Windows, do **not** append `memhub` after the package name.
+> If a source `.js` file opens in editor, upgrade to latest package version (`0.1.2+`) and retry.
 
 Example MCP client config:
 
@@ -185,7 +186,7 @@ memhub/
 - [x] Quality gate (lint/typecheck/test/coverage)
 - [ ] Integration tests
 - [ ] Performance improvements
-- [x] npm release (`@synth-coder/memhub@0.1.1`)
+- [x] npm release (`@synth-coder/memhub@0.1.2`)
 
 ---
 

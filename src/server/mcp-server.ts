@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * MCP Server - Model Context Protocol server implementation
  * Communicates via stdio

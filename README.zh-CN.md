@@ -61,6 +61,7 @@ npx -y @synth-coder/memhub
 ```
 
 > Windows 下不要在包名后再加 `memhub` 参数。
+> 如果出现“弹出源码 .js 文件”的情况，请升级到最新版本（`0.1.2+`）后重试。
 
 在你的 MCP 客户端配置中添加：
 
@@ -183,7 +184,7 @@ memhub/
 - [x] 质量门禁（lint/typecheck/test/coverage）
 - [ ] 集成测试
 - [ ] 性能优化
-- [x] npm 发布（`@synth-coder/memhub@0.1.1`）
+- [x] npm 发布（`@synth-coder/memhub@0.1.2`）
 
 ---
 
