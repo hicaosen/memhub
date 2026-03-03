@@ -52,14 +52,14 @@ export const TOOL_DEFINITIONS: readonly Tool[] = [
   {
     name: 'memory_load',
     description:
-      'STM first step. Call at the first turn after receiving user prompt to load short-term memory context for this session/task.',
+      'MANDATORY STM step #1 (stability-first). Call memory_load as the FIRST tool call after each new user prompt, before analysis or planning. Goal: recover short-term memory for the current task so the next 1-3 turns stay coherent and do not repeat user input. Prefer { sessionId, scope:"stm", limit:20 }; add { date } for date-scoped tasks and { query } for keyword-driven tasks. If unavailable, continue the task and still provide a final answer.',
     inputSchema: {
       type: 'object',
       properties: {
         id: { type: 'string', description: 'Optional memory id for direct fetch' },
         sessionId: {
           type: 'string',
-          description: 'Optional session UUID to load current CLI/task context',
+          description: 'Recommended. Stable session UUID for this task/thread. Reuse same value across memory_load/memory_update.',
         },
         date: { type: 'string', description: 'Optional date filter (YYYY-MM-DD)' },
         query: { type: 'string', description: 'Optional text query for relevant context' },
@@ -69,7 +69,7 @@ export const TOOL_DEFINITIONS: readonly Tool[] = [
         scope: {
           type: 'string',
           enum: ['stm', 'all'],
-          description: 'stm for short-term context window; all for broader retrieval',
+          description: 'Use "stm" by default for current-task context expected to be reused in ~3 turns. Use "all" only when broad historical recall is required.',
         },
       },
       additionalProperties: false,
@@ -78,22 +78,23 @@ export const TOOL_DEFINITIONS: readonly Tool[] = [
   {
     name: 'memory_update',
     description:
-      'STM write-back step. Call at the final turn to append/upsert new decisions, preferences, task-state changes, and key outputs.',
+      'MANDATORY STM step #2 (closed loop). Call memory_update as the FINAL tool call before your final user answer. Write only high-value short-term updates likely reused in the next 1-3 turns: decisions made, preference/constraint changes, task state transitions, and reusable conclusions. Keep content concise, factual, and task-bound. Never store secrets or credentials. If unavailable, still return the final user answer.',
     inputSchema: {
       type: 'object',
       properties: {
         id: { type: 'string', description: 'Optional id. Present = update existing record' },
-        sessionId: { type: 'string', description: 'Session UUID. Auto-created if omitted' },
-        mode: { type: 'string', enum: ['append', 'upsert'], description: 'Default append' },
+        sessionId: { type: 'string', description: 'Recommended. Same session UUID used in memory_load. Auto-created if omitted.' },
+        mode: { type: 'string', enum: ['append', 'upsert'], description: 'append = add new STM item (default). upsert = update existing item, usually with id.' },
         entryType: {
           type: 'string',
           enum: ['decision', 'preference', 'knowledge', 'todo', 'state_change'],
+          description: 'Use the most specific type to improve next-turn retrieval quality: decision/preference/knowledge/todo/state_change.',
         },
         title: { type: 'string', description: 'Optional title' },
-        content: { type: 'string', description: 'Required memory body' },
+        content: { type: 'string', description: 'Required. Concise reusable summary (for next ~3 turns), not full transcript.' },
         tags: { type: 'array', items: { type: 'string' } },
         category: { type: 'string' },
-        importance: { type: 'number' },
+        importance: { type: 'number', description: 'Optional priority score (1-5). Use higher values for likely near-term reuse.' },
       },
       required: ['content'],
       additionalProperties: false,
