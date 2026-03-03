@@ -26,13 +26,15 @@ describe('McpServer (SDK)', () => {
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'memhub-server-test-'));
     process.env.MEMHUB_STORAGE_PATH = tempDir;
+    process.env.MEMHUB_VECTOR_SEARCH = 'false';
     server = createMcpServer();
-    memoryService = new MemoryService({ storagePath: tempDir });
+    memoryService = new MemoryService({ storagePath: tempDir, vectorSearch: false });
   });
 
   afterEach(() => {
     rmSync(tempDir, { recursive: true, force: true });
     delete process.env.MEMHUB_STORAGE_PATH;
+    delete process.env.MEMHUB_VECTOR_SEARCH;
   });
 
   describe('createMcpServer', () => {
@@ -114,7 +116,7 @@ describe('McpServer (SDK)', () => {
       });
 
       const result = await memoryService.memoryUpdate(input);
-      
+
       expect(result).toHaveProperty('id');
       expect(result).toHaveProperty('sessionId');
       expect(result.sessionId).toBe('550e8400-e29b-41d4-a716-446655440000');
@@ -133,14 +135,14 @@ describe('McpServer (SDK)', () => {
       });
 
       const updateResult = await memoryService.memoryUpdate(updateInput);
-      
+
       // Then load it
       const loadInput = MemoryLoadInputSchema.parse({
         id: updateResult.id,
       });
 
       const loadResult = await memoryService.memoryLoad(loadInput);
-      
+
       expect(loadResult).toHaveProperty('items');
       expect(loadResult.items.length).toBeGreaterThan(0);
       expect(loadResult.items[0].title).toBe('Test preference');
@@ -158,7 +160,7 @@ describe('McpServer (SDK)', () => {
         limit: 10,
         scope: 'stm',
       });
-      
+
       expect(validInput.sessionId).toBe('550e8400-e29b-41d4-a716-446655440002');
       expect(validInput.limit).toBe(10);
       expect(validInput.scope).toBe('stm');

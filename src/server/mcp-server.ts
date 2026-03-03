@@ -4,7 +4,7 @@
  * Uses @modelcontextprotocol/sdk for protocol handling
  */
 
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -29,7 +29,12 @@ interface PackageJson {
 }
 
 // npm package runtime: dist/src/server -> package root
-const packageJsonPath = join(__dirname, '../../../package.json');
+// test runtime: src/server -> package root
+let packageJsonPath = join(__dirname, '../../../package.json');
+if (!existsSync(packageJsonPath)) {
+  // Fallback for test environment (running from src/)
+  packageJsonPath = join(__dirname, '../../package.json');
+}
 
 const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as PackageJson;
 
@@ -38,7 +43,8 @@ const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as Packag
  */
 export function createMcpServer(): Server {
   const storagePath = process.env.MEMHUB_STORAGE_PATH || './memories';
-  const memoryService = new MemoryService({ storagePath });
+  const vectorSearch = process.env.MEMHUB_VECTOR_SEARCH !== 'false';
+  const memoryService = new MemoryService({ storagePath, vectorSearch });
 
   // Create server using SDK
   const server = new Server(
@@ -142,3 +148,15 @@ main().catch((error) => {
   console.error('Fatal error:', error);
   process.exit(1);
 });
+
+// Check if this file is being run directly
+const isMain = import.meta.url === `file://${process.argv[1]}` || false;
+if (isMain) {
+  // Defer main() execution to avoid blocking module loading
+  setImmediate(() => {
+    main().catch((error) => {
+      console.error('Fatal error:', error);
+      process.exit(1);
+    });
+  });
+}

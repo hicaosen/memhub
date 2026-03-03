@@ -15,7 +15,7 @@ describe('MemoryService Edge Cases', () => {
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'memhub-edge-test-'));
-    memoryService = new MemoryService({ storagePath: tempDir });
+    memoryService = new MemoryService({ storagePath: tempDir, vectorSearch: false });
   });
 
   afterEach(() => {

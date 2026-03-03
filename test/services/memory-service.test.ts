@@ -21,7 +21,7 @@ describe('MemoryService', () => {
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'memhub-test-'));
-    memoryService = new MemoryService({ storagePath: tempDir });
+    memoryService = new MemoryService({ storagePath: tempDir, vectorSearch: false });
   });
 
   afterEach(() => {
