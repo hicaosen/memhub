@@ -23,6 +23,9 @@ import type {
 } from '../contracts/types.js';
 import { ErrorCode } from '../contracts/types.js';
 import { MarkdownStorage, StorageError } from '../storage/markdown-storage.js';
+import lockfile from 'proper-lockfile';
+
+const LOCK_TIMEOUT = 5000; // 5 seconds
 
 /** Minimal interface required from VectorIndex (avoids static import of native module) */
 interface IVectorIndex {
@@ -68,12 +71,14 @@ export interface MemoryServiceConfig {
  * Memory service implementation
  */
 export class MemoryService {
+  private readonly storagePath: string;
   private readonly storage: MarkdownStorage;
   private readonly vectorIndex: IVectorIndex | null;
   private readonly embedding: IEmbeddingService | null;
   private readonly vectorSearchEnabled: boolean;
 
   constructor(config: MemoryServiceConfig) {
+    this.storagePath = config.storagePath;
     this.storage = new MarkdownStorage({ storagePath: config.storagePath });
     this.vectorSearchEnabled = config.vectorSearch !== false;
 
@@ -172,29 +177,36 @@ export class MemoryService {
    * Creates a new memory entry
    */
   async create(input: CreateMemoryInput): Promise<CreateResult> {
-    const now = new Date().toISOString();
-    const id = randomUUID();
-
-    const memory: Memory = {
-      id,
-      createdAt: now,
-      updatedAt: now,
-      tags: input.tags ?? [],
-      category: input.category ?? 'general',
-      importance: input.importance ?? 3,
-      title: input.title,
-      content: input.content,
-    };
-
+    const release = await lockfile.lock(this.storagePath, {
+      retries: { retries: 100, minTimeout: 50, maxTimeout: LOCK_TIMEOUT / 100 },
+    });
     try {
-      const filePath = await this.storage.write(memory);
-      this.scheduleVectorUpsert(memory);
-      return { id, filePath, memory };
-    } catch (error) {
-      throw new ServiceError(
-        `Failed to create memory: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        ErrorCode.STORAGE_ERROR
-      );
+      const now = new Date().toISOString();
+      const id = randomUUID();
+
+      const memory: Memory = {
+        id,
+        createdAt: now,
+        updatedAt: now,
+        tags: input.tags ?? [],
+        category: input.category ?? 'general',
+        importance: input.importance ?? 3,
+        title: input.title,
+        content: input.content,
+      };
+
+      try {
+        const filePath = await this.storage.write(memory);
+        this.scheduleVectorUpsert(memory);
+        return { id, filePath, memory };
+      } catch (error) {
+        throw new ServiceError(
+          `Failed to create memory: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          ErrorCode.STORAGE_ERROR
+        );
+      }
+    } finally {
+      await release();
     }
   }
 
@@ -220,38 +232,45 @@ export class MemoryService {
    * Updates an existing memory
    */
   async update(input: UpdateMemoryInput): Promise<UpdateResult> {
-    let existing: Memory;
+    const release = await lockfile.lock(this.storagePath, {
+      retries: { retries: 100, minTimeout: 50, maxTimeout: LOCK_TIMEOUT / 100 },
+    });
     try {
-      existing = await this.storage.read(input.id);
-    } catch (error) {
-      if (error instanceof StorageError && error.message.includes('not found')) {
-        throw new ServiceError(`Memory not found: ${input.id}`, ErrorCode.NOT_FOUND);
+      let existing: Memory;
+      try {
+        existing = await this.storage.read(input.id);
+      } catch (error) {
+        if (error instanceof StorageError && error.message.includes('not found')) {
+          throw new ServiceError(`Memory not found: ${input.id}`, ErrorCode.NOT_FOUND);
+        }
+        throw new ServiceError(
+          `Failed to read memory for update: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          ErrorCode.STORAGE_ERROR
+        );
       }
-      throw new ServiceError(
-        `Failed to read memory for update: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        ErrorCode.STORAGE_ERROR
-      );
-    }
 
-    const updated: Memory = {
-      ...existing,
-      updatedAt: new Date().toISOString(),
-      ...(input.title !== undefined && { title: input.title }),
-      ...(input.content !== undefined && { content: input.content }),
-      ...(input.tags !== undefined && { tags: input.tags }),
-      ...(input.category !== undefined && { category: input.category }),
-      ...(input.importance !== undefined && { importance: input.importance }),
-    };
+      const updated: Memory = {
+        ...existing,
+        updatedAt: new Date().toISOString(),
+        ...(input.title !== undefined && { title: input.title }),
+        ...(input.content !== undefined && { content: input.content }),
+        ...(input.tags !== undefined && { tags: input.tags }),
+        ...(input.category !== undefined && { category: input.category }),
+        ...(input.importance !== undefined && { importance: input.importance }),
+      };
 
-    try {
-      await this.storage.write(updated);
-      this.scheduleVectorUpsert(updated);
-      return { memory: updated };
-    } catch (error) {
-      throw new ServiceError(
-        `Failed to update memory: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        ErrorCode.STORAGE_ERROR
-      );
+      try {
+        await this.storage.write(updated);
+        this.scheduleVectorUpsert(updated);
+        return { memory: updated };
+      } catch (error) {
+        throw new ServiceError(
+          `Failed to update memory: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          ErrorCode.STORAGE_ERROR
+        );
+      }
+    } finally {
+      await release();
     }
   }
 
@@ -259,6 +278,9 @@ export class MemoryService {
    * Deletes a memory by ID
    */
   async delete(input: DeleteMemoryInput): Promise<DeleteResult> {
+    const release = await lockfile.lock(this.storagePath, {
+      retries: { retries: 100, minTimeout: 50, maxTimeout: LOCK_TIMEOUT / 100 },
+    });
     try {
       const filePath = await this.storage.delete(input.id);
       await this.removeFromVectorIndex(input.id);
@@ -271,6 +293,8 @@ export class MemoryService {
         `Failed to delete memory: ${error instanceof Error ? error.message : 'Unknown error'}`,
         ErrorCode.STORAGE_ERROR
       );
+    } finally {
+      await release();
     }
   }
 
@@ -514,63 +538,81 @@ export class MemoryService {
    * memory_update — unified write API (append/upsert)
    */
   async memoryUpdate(input: MemoryUpdateInput): Promise<MemoryUpdateOutput> {
-    const now = new Date().toISOString();
-    const sessionId = input.sessionId ?? randomUUID();
+    const release = await lockfile.lock(this.storagePath, {
+      retries: { retries: 100, minTimeout: 50, maxTimeout: LOCK_TIMEOUT / 100 },
+    });
+    try {
+      const now = new Date().toISOString();
+      const sessionId = input.sessionId ?? randomUUID();
 
-    if (input.id) {
-      const updatedResult = await this.update({
-        id: input.id,
-        title: input.title,
-        content: input.content,
-        tags: input.tags,
-        category: input.category,
-        importance: input.importance,
-      });
+      if (input.id) {
+        // Inline update logic to avoid nested lock
+        let existing: Memory;
+        try {
+          existing = await this.storage.read(input.id);
+        } catch (error) {
+          if (error instanceof StorageError && error.message.includes('not found')) {
+            throw new ServiceError(`Memory not found: ${input.id}`, ErrorCode.NOT_FOUND);
+          }
+          throw new ServiceError(
+            `Failed to read memory for update: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            ErrorCode.STORAGE_ERROR
+          );
+        }
 
-      const updatedMemory: Memory = {
-        ...updatedResult.memory,
+        const updatedMemory: Memory = {
+          ...existing,
+          updatedAt: now,
+          sessionId,
+          entryType: input.entryType,
+          ...(input.title !== undefined && { title: input.title }),
+          ...(input.content !== undefined && { content: input.content }),
+          ...(input.tags !== undefined && { tags: input.tags }),
+          ...(input.category !== undefined && { category: input.category }),
+          ...(input.importance !== undefined && { importance: input.importance }),
+        };
+
+        const filePath = await this.storage.write(updatedMemory);
+        this.scheduleVectorUpsert(updatedMemory);
+
+        return {
+          id: updatedMemory.id,
+          sessionId,
+          filePath,
+          created: false,
+          updated: true,
+          memory: updatedMemory,
+        };
+      }
+
+      const id = randomUUID();
+      const createdMemory: Memory = {
+        id,
+        createdAt: now,
+        updatedAt: now,
         sessionId,
         entryType: input.entryType,
+        tags: input.tags ?? [],
+        category: input.category ?? 'general',
+        importance: input.importance ?? 3,
+        title: input.title ?? 'memory note',
+        content: input.content,
       };
 
-      const filePath = await this.storage.write(updatedMemory);
-      this.scheduleVectorUpsert(updatedMemory);
+      const filePath = await this.storage.write(createdMemory);
+      this.scheduleVectorUpsert(createdMemory);
 
       return {
-        id: updatedMemory.id,
+        id,
         sessionId,
         filePath,
-        created: false,
-        updated: true,
-        memory: updatedMemory,
+        created: true,
+        updated: false,
+        memory: createdMemory,
       };
+    } finally {
+      await release();
     }
-
-    const id = randomUUID();
-    const createdMemory: Memory = {
-      id,
-      createdAt: now,
-      updatedAt: now,
-      sessionId,
-      entryType: input.entryType,
-      tags: input.tags ?? [],
-      category: input.category ?? 'general',
-      importance: input.importance ?? 3,
-      title: input.title ?? 'memory note',
-      content: input.content,
-    };
-
-    const filePath = await this.storage.write(createdMemory);
-    this.scheduleVectorUpsert(createdMemory);
-
-    return {
-      id,
-      sessionId,
-      filePath,
-      created: true,
-      updated: false,
-      memory: createdMemory,
-    };
   }
 
   // ---------------------------------------------------------------------------
