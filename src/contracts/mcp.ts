@@ -15,7 +15,7 @@ export const MCP_PROTOCOL_VERSION = '2024-11-05';
 /** Server information */
 export const SERVER_INFO = {
   name: 'memhub',
-  version: '0.1.0',
+  version: '0.2.0',
 } as const;
 
 // ============================================================================
