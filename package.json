@@ -1,5 +1,5 @@
 {
-  "name": "memhub",
+  "name": "@synth-coder/memhub",
   "version": "0.1.0",
   "description": "A Git-friendly memory hub using Markdown-based storage with YAML Front Matter",
   "type": "module",
