@@ -1,0 +1,248 @@
+/**
+ * Memory Service Edge Case Tests
+ * Additional tests for better coverage
+ */
+
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { MemoryService, ServiceError } from '../../src/services/memory-service.js';
+
+describe('MemoryService Edge Cases', () => {
+  let tempDir: string;
+  let memoryService: MemoryService;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'memhub-edge-test-'));
+    memoryService = new MemoryService({ storagePath: tempDir });
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  describe('create with edge cases', () => {
+    it('should handle empty content', async () => {
+      const result = await memoryService.create({
+        title: 'Empty Content',
+        content: '',
+      });
+      expect(result.memory.content).toBe('');
+    });
+
+    it('should handle very long title', async () => {
+      const longTitle = 'A'.repeat(200);
+      const result = await memoryService.create({
+        title: longTitle,
+        content: 'Content',
+      });
+      expect(result.memory.title).toBe(longTitle);
+    });
+
+    it('should handle special characters in title', async () => {
+      const result = await memoryService.create({
+        title: 'Title with @#$%^&*() special chars!',
+        content: 'Content',
+      });
+      expect(result.memory.title).toBe('Title with @#$%^&*() special chars!');
+    });
+
+    it('should handle many tags', async () => {
+      const tags = Array.from({ length: 20 }, (_, i) => `tag${i}`);
+      const result = await memoryService.create({
+        title: 'Many Tags',
+        content: 'Content',
+        tags,
+      });
+      expect(result.memory.tags).toHaveLength(20);
+    });
+  });
+
+  describe('update edge cases', () => {
+    it('should update only tags', async () => {
+      const created = await memoryService.create({
+        title: 'Title',
+        content: 'Content',
+        tags: ['old'],
+      });
+      const updated = await memoryService.update({
+        id: created.id,
+        tags: ['new1', 'new2'],
+      });
+      expect(updated.memory.tags).toEqual(['new1', 'new2']);
+      expect(updated.memory.title).toBe('Title');
+      expect(updated.memory.content).toBe('Content');
+    });
+
+    it('should update only importance', async () => {
+      const created = await memoryService.create({
+        title: 'Title',
+        content: 'Content',
+        importance: 1,
+      });
+      const updated = await memoryService.update({
+        id: created.id,
+        importance: 5,
+      });
+      expect(updated.memory.importance).toBe(5);
+    });
+
+    it('should update only category', async () => {
+      const created = await memoryService.create({
+        title: 'Title',
+        content: 'Content',
+        category: 'old-category',
+      });
+      const updated = await memoryService.update({
+        id: created.id,
+        category: 'new-category',
+      });
+      expect(updated.memory.category).toBe('new-category');
+    });
+  });
+
+  describe('list with various filters', () => {
+    beforeEach(async () => {
+      // Create test data with various dates
+      const baseDate = new Date('2024-01-15');
+      for (let i = 0; i < 5; i++) {
+        const date = new Date(baseDate);
+        date.setDate(date.getDate() + i);
+        await memoryService.create({
+          title: `Memory ${i}`,
+          content: 'Content',
+          category: i % 2 === 0 ? 'even' : 'odd',
+          tags: [`tag${i}`, 'common'],
+        });
+      }
+    });
+
+    it('should filter by date range', async () => {
+      // The created memories will have current timestamp, so we need to use a wide range
+      const now = new Date();
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const result = await memoryService.list({
+        fromDate: yesterday.toISOString(),
+        toDate: tomorrow.toISOString(),
+      });
+      expect(result.memories.length).toBeGreaterThan(0);
+    });
+
+    it('should handle empty result with strict filters', async () => {
+      const result = await memoryService.list({
+        category: 'non-existent',
+      });
+      expect(result.memories).toHaveLength(0);
+      expect(result.total).toBe(0);
+      expect(result.hasMore).toBe(false);
+    });
+
+    it('should sort by importance', async () => {
+      await memoryService.create({
+        title: 'High Importance',
+        content: 'Content',
+        importance: 5,
+      });
+      await memoryService.create({
+        title: 'Low Importance',
+        content: 'Content',
+        importance: 1,
+      });
+
+      const result = await memoryService.list({
+        sortBy: 'importance',
+        sortOrder: 'desc',
+      });
+      expect(result.memories[0].importance).toBe(5);
+    });
+
+    it('should handle pagination across multiple pages', async () => {
+      const page1 = await memoryService.list({ limit: 2, offset: 0 });
+      expect(page1.memories).toHaveLength(2);
+      expect(page1.hasMore).toBe(true);
+
+      const page2 = await memoryService.list({ limit: 2, offset: 2 });
+      expect(page2.memories).toHaveLength(2);
+      expect(page2.hasMore).toBe(true);
+
+      const page3 = await memoryService.list({ limit: 2, offset: 4 });
+      expect(page3.memories.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe('search edge cases', () => {
+    beforeEach(async () => {
+      await memoryService.create({
+        title: 'Project Alpha',
+        content: 'This is about the alpha project development.',
+        tags: ['alpha', 'dev'],
+      });
+      await memoryService.create({
+        title: 'Project Beta',
+        content: 'Beta testing is in progress.',
+        tags: ['beta', 'testing'],
+      });
+    });
+
+    it('should search with case insensitivity', async () => {
+      const result = await memoryService.search({ query: 'ALPHA' });
+      expect(result.results.length).toBeGreaterThan(0);
+    });
+
+    it('should handle search with no results', async () => {
+      const result = await memoryService.search({ query: 'xyznonexistent' });
+      expect(result.results).toHaveLength(0);
+      expect(result.total).toBe(0);
+    });
+
+    it('should limit search results', async () => {
+      const result = await memoryService.search({ query: 'project', limit: 1 });
+      expect(result.results.length).toBeLessThanOrEqual(1);
+    });
+
+    it('should search with category filter', async () => {
+      await memoryService.create({
+        title: 'Work Item',
+        content: 'Work content',
+        category: 'work',
+      });
+      const result = await memoryService.search({
+        query: 'work',
+        category: 'work',
+      });
+      expect(result.results.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('getCategories and getTags edge cases', () => {
+    it('should return sorted categories', async () => {
+      await memoryService.create({ title: 'A', content: 'C', category: 'zebra' });
+      await memoryService.create({ title: 'B', content: 'C', category: 'alpha' });
+      await memoryService.create({ title: 'C', content: 'C', category: 'beta' });
+
+      const result = await memoryService.getCategories();
+      expect(result.categories).toEqual(['alpha', 'beta', 'zebra']);
+    });
+
+    it('should return sorted tags', async () => {
+      await memoryService.create({ title: 'A', content: 'C', tags: ['zebra', 'alpha'] });
+      await memoryService.create({ title: 'B', content: 'C', tags: ['beta'] });
+
+      const result = await memoryService.getTags();
+      expect(result.tags).toEqual(['alpha', 'beta', 'zebra']);
+    });
+
+    it('should handle duplicate tags across memories', async () => {
+      await memoryService.create({ title: 'A', content: 'C', tags: ['shared'] });
+      await memoryService.create({ title: 'B', content: 'C', tags: ['shared'] });
+
+      const result = await memoryService.getTags();
+      expect(result.tags).toEqual(['shared']);
+    });
+  });
+});

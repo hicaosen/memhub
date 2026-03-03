@@ -1,0 +1,169 @@
+# MemHub
+
+一个面向编码代理（Codex / Claude Code / OpenCode 等）的 **Git 友好记忆 MCP Server**。
+
+MemHub 将“用户决策、长期偏好、可复用知识”保存为 **Markdown 文件 + YAML Front Matter**，便于人读、审查、版本管理和协作。
+
+---
+
+## 为什么用 MemHub
+
+- **Git 原生**：所有记忆都是纯文本文件，天然可 diff / 可回滚
+- **面向 Agent**：通过 MCP（stdio）暴露工具，便于模型调用
+- **人类可读**：元数据在 YAML，正文在 Markdown
+- **质量可控**：内置 lint / typecheck / test / coverage 门禁
+
+---
+
+## 核心特性
+
+- Markdown 持久化（`.md`）
+- YAML Front Matter 元数据（`id / tags / category / importance / 时间戳`）
+- 记忆条目的增删改查（CRUD）
+- 支持过滤、分页、全文检索
+- 分类/标签聚合能力
+- MCP stdio server，可接入主流 MCP 客户端
+
+---
+
+## 快速开始
+
+### 1）安装依赖
+
+```bash
+npm install
+```
+
+### 2）构建
+
+```bash
+npm run build
+```
+
+### 3）执行质量门禁
+
+```bash
+npm run quality
+```
+
+---
+
+## 作为 MCP Server 使用（stdio）
+
+在你的 MCP 客户端配置中添加：
+
+```json
+{
+  "mcpServers": {
+    "memhub": {
+      "command": "node",
+      "args": ["dist/server/mcp-server.js"],
+      "env": {
+        "MEMHUB_STORAGE_PATH": "/绝对路径/你的记忆目录",
+        "MEMHUB_LOG_LEVEL": "info"
+      }
+    }
+  }
+}
+```
+
+> 若后续发布到 npm 并全局安装，也可以改为通过包的 bin 入口启动。
+
+---
+
+## 环境变量
+
+- `MEMHUB_STORAGE_PATH`：记忆存储目录（默认：`./memories`）
+- `MEMHUB_LOG_LEVEL`：日志级别（默认：`info`，可选：`debug|info|warn|error`）
+
+---
+
+## 记忆文件格式
+
+```markdown
+---
+id: "550e8400-e29b-41d4-a716-446655440000"
+created_at: "2026-03-03T08:00:00.000Z"
+updated_at: "2026-03-03T08:00:00.000Z"
+tags:
+  - architecture
+  - tdd
+category: "engineering"
+importance: 4
+---
+
+# Contract-first MCP 设计
+
+先定义工具契约与 schema，再进入实现。
+```
+
+文件名格式：
+
+```text
+YYYY-MM-DD-title-slug.md
+```
+
+---
+
+## MCP 工具列表
+
+> 调用策略建议见：`docs/tool-calling-policy.md`（首轮 `memory_load`，末轮 `memory_update`）。
+
+- `memory_load`：首轮加载短期记忆（STM）上下文
+- `memory_update`：末轮回写决策/偏好/知识/状态变化
+
+---
+
+## 开发说明
+
+### 常用脚本
+
+```bash
+npm run build
+npm run lint
+npm run typecheck
+npm run test
+npm run test:coverage
+npm run quality
+```
+
+### 工程流程（默认）
+
+- 契约优先（先类型与 schema）
+- 严格 TDD（`红 -> 绿 -> 重构`）
+- 合并前必须通过质量门禁
+- 覆盖率阈值：**>= 80%**
+
+---
+
+## 项目结构
+
+```text
+memhub/
+├── docs/
+├── src/
+│   ├── contracts/
+│   ├── server/
+│   ├── services/
+│   ├── storage/
+│   └── utils/
+├── test/
+└── .github/workflows/
+```
+
+---
+
+## 路线图
+
+- [x] 架构与契约设计
+- [x] 核心实现（storage/service/server）
+- [x] 质量门禁（lint/typecheck/test/coverage）
+- [ ] 集成测试
+- [ ] 性能优化
+- [ ] npm 发布
+
+---
+
+## License
+
+MIT
