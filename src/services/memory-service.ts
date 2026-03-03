@@ -502,10 +502,7 @@ export class MemoryService {
         tags: input.tags,
         limit: input.limit,
       });
-      let items = searched.results.map(r => r.memory);
-      if (input.sessionId) {
-        items = items.filter(m => m.sessionId === input.sessionId);
-      }
+      const items = searched.results.map(r => r.memory);
       return { items, total: items.length };
     }
 

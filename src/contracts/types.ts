@@ -25,11 +25,10 @@ export type Slug = string;
  * Content is split between YAML Front Matter (metadata) and Markdown body
  */
 export type MemoryEntryType =
-  | 'decision'
-  | 'preference'
-  | 'knowledge'
-  | 'todo'
-  | 'state_change';
+  | 'preference'  // User likes/dislikes
+  | 'decision'    // Technical choices with reasoning
+  | 'context'     // Project/environment information
+  | 'fact';       // Objective knowledge
 
 export interface Memory {
   /** UUID v4 unique identifier */
@@ -249,11 +248,8 @@ export interface SearchMemoryInput extends Partial<MemoryFilter> {
  */
 export interface MemoryLoadInput extends Partial<MemoryFilter> {
   readonly id?: UUID;
-  readonly sessionId?: UUID;
-  readonly date?: string;
   readonly query?: string;
   readonly limit?: number;
-  readonly scope?: 'stm' | 'all';
 }
 
 /**

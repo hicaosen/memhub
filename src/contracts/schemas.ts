@@ -41,11 +41,10 @@ export const ImportanceSchema = z.number().int().min(1).max(5);
 
 /** STM memory entry type */
 export const MemoryEntryTypeSchema = z.enum([
-  'decision',
-  'preference',
-  'knowledge',
-  'todo',
-  'state_change',
+  'preference',  // User likes/dislikes
+  'decision',    // Technical choices with reasoning
+  'context',     // Project/environment information
+  'fact',        // Objective knowledge
 ]);
 
 // ============================================================================
@@ -208,13 +207,10 @@ export const SearchMemoryInputSchema = z.object({
 /** memory_load input schema */
 export const MemoryLoadInputSchema = z.object({
   id: UUIDSchema.optional(),
-  sessionId: UUIDSchema.optional(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   query: z.string().min(1).max(1000).optional(),
   category: CategorySchema.optional(),
   tags: z.array(TagSchema).optional(),
   limit: z.number().int().min(1).max(100).optional(),
-  scope: z.enum(['stm', 'all']).optional(),
 });
 
 /** memory_update (upsert/append) input schema */

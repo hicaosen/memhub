@@ -156,14 +156,14 @@ describe('McpServer (SDK)', () => {
 
     it('should validate memory_load input schema', () => {
       const validInput = MemoryLoadInputSchema.parse({
-        sessionId: '550e8400-e29b-41d4-a716-446655440002',
+        query: 'test query',
         limit: 10,
-        scope: 'stm',
+        category: 'general',
       });
 
-      expect(validInput.sessionId).toBe('550e8400-e29b-41d4-a716-446655440002');
+      expect(validInput.query).toBe('test query');
       expect(validInput.limit).toBe(10);
-      expect(validInput.scope).toBe('stm');
+      expect(validInput.category).toBe('general');
     });
   });
 });

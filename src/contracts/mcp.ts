@@ -51,25 +51,47 @@ export type ToolName = (typeof TOOL_NAMES)[number];
 export const TOOL_DEFINITIONS: readonly Tool[] = [
   {
     name: 'memory_load',
-    description:
-      'STM first step. Call at the first turn after receiving user prompt to load short-term memory context for this session/task.',
+    description: `Retrieve stored memories to recall user preferences, past decisions, project context, and learned knowledge.
+
+WHEN TO USE (call proactively):
+• Starting a new conversation or task
+• User references past discussions ("remember when...", "as I mentioned before")
+• Need context about user's coding style, preferences, or project decisions
+• Uncertain about user's existing preferences or constraints
+• Before making assumptions about user requirements
+
+WHAT IT PROVIDES:
+• User preferences (coding style, frameworks, naming conventions)
+• Past decisions and their rationale
+• Project-specific context and constraints
+• Previously learned knowledge about the user
+
+Call this early to provide personalized, context-aware responses.`,
     inputSchema: {
       type: 'object',
       properties: {
-        id: { type: 'string', description: 'Optional memory id for direct fetch' },
-        sessionId: {
+        query: {
           type: 'string',
-          description: 'Optional session UUID to load current CLI/task context',
+          description:
+            'Search query to find relevant memories. Examples: "react preferences", "error handling approach", "database choice"',
         },
-        date: { type: 'string', description: 'Optional date filter (YYYY-MM-DD)' },
-        query: { type: 'string', description: 'Optional text query for relevant context' },
-        category: { type: 'string' },
-        tags: { type: 'array', items: { type: 'string' } },
-        limit: { type: 'number', description: 'Max results, default 20' },
-        scope: {
+        id: {
           type: 'string',
-          enum: ['stm', 'all'],
-          description: 'stm for short-term context window; all for broader retrieval',
+          description: 'Direct lookup by memory ID (if known)',
+        },
+        category: {
+          type: 'string',
+          description:
+            'Filter by category: "general" (default), "preference", "decision", "knowledge", "project"',
+        },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Filter by tags. Example: ["typescript", "backend"]',
+        },
+        limit: {
+          type: 'number',
+          description: 'Max results (default: 20, max: 100)',
         },
       },
       additionalProperties: false,
@@ -77,23 +99,59 @@ export const TOOL_DEFINITIONS: readonly Tool[] = [
   },
   {
     name: 'memory_update',
-    description:
-      'STM write-back step. Call at the final turn to append/upsert new decisions, preferences, task-state changes, and key outputs.',
+    description: `Store important information to remember for future conversations.
+
+WHEN TO USE (call when learning something worth remembering):
+• User explicitly states a preference ("I prefer functional components")
+• User makes a decision with rationale ("We'll use PostgreSQL because...")
+• You discover important project context (tech stack, constraints, patterns)
+• User corrects your assumption ("Actually, I don't use Redux")
+• Task state changes that should persist
+
+WHAT TO STORE:
+• Preferences: coding style, frameworks, naming conventions
+• Decisions: architecture choices, library selections, with reasoning
+• Knowledge: project-specific patterns, gotchas, conventions
+• Context: team structure, deployment process, testing approach
+
+TIPS:
+• content is required and most important
+• title helps with search (auto-generated if omitted)
+• Use entryType to categorize: "preference", "decision", "context", "fact"
+• importance: 1-5 (default: 3), higher = more critical to remember`,
     inputSchema: {
       type: 'object',
       properties: {
-        id: { type: 'string', description: 'Optional id. Present = update existing record' },
-        sessionId: { type: 'string', description: 'Session UUID. Auto-created if omitted' },
-        mode: { type: 'string', enum: ['append', 'upsert'], description: 'Default append' },
+        content: {
+          type: 'string',
+          description:
+            'The information to remember. Be specific and include context. Example: "User prefers TypeScript with strict mode. Uses functional React components with hooks. Avoids class components."',
+        },
+        title: {
+          type: 'string',
+          description:
+            'Brief title for the memory (auto-generated from content if omitted). Example: "TypeScript and React preferences"',
+        },
         entryType: {
           type: 'string',
-          enum: ['decision', 'preference', 'knowledge', 'todo', 'state_change'],
+          enum: ['preference', 'decision', 'context', 'fact'],
+          description:
+            'Type of memory. "preference" for user likes/dislikes, "decision" for choices made, "context" for project info, "fact" for learned facts',
         },
-        title: { type: 'string', description: 'Optional title' },
-        content: { type: 'string', description: 'Required memory body' },
-        tags: { type: 'array', items: { type: 'string' } },
-        category: { type: 'string' },
-        importance: { type: 'number' },
+        category: {
+          type: 'string',
+          description:
+            'Category for grouping. Default: "general". Example: "frontend", "backend", "project-alpha"',
+        },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Tags for filtering. Example: ["typescript", "react", "coding-style"]',
+        },
+        importance: {
+          type: 'number',
+          description: 'Importance level 1-5. 5 = critical, always recall. Default: 3',
+        },
       },
       required: ['content'],
       additionalProperties: false,
@@ -145,20 +203,17 @@ export type ToolResult<T extends ToolName> = T extends 'memory_load'
 export type ToolInput<T extends ToolName> = T extends 'memory_load'
   ? {
       id?: string;
-      sessionId?: string;
-      date?: string;
       query?: string;
       category?: string;
       tags?: string[];
       limit?: number;
-      scope?: 'stm' | 'all';
     }
   : T extends 'memory_update'
     ? {
         id?: string;
         sessionId?: string;
         mode?: 'append' | 'upsert';
-        entryType?: 'decision' | 'preference' | 'knowledge' | 'todo' | 'state_change';
+        entryType?: 'preference' | 'decision' | 'context' | 'fact';
         title?: string;
         content: string;
         tags?: string[];
