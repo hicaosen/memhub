@@ -184,7 +184,7 @@ memhub/
 - [x] 质量门禁（lint/typecheck/test/coverage）
 - [ ] 集成测试
 - [ ] 性能优化
-- [x] npm 发布（`@synth-coder/memhub@0.1.2`）
+- [x] npm 发布（`@synth-coder/memhub@0.1.3`）
 
 ---
 

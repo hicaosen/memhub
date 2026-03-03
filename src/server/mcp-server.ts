@@ -39,9 +39,10 @@ interface PackageJson {
   version?: string;
 }
 
-const packageJson = JSON.parse(
-  readFileSync(join(__dirname, '../../package.json'), 'utf-8')
-) as PackageJson;
+// npm package runtime: dist/src/server -> package root
+const packageJsonPath = join(__dirname, '../../../package.json');
+
+const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as PackageJson;
 
 /**
  * MCP Server implementation
