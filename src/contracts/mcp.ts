@@ -1,6 +1,6 @@
 /**
  * MCP (Model Context Protocol) specific types and constants
- * Defines the protocol structures for stdio-based communication
+ * Tool definitions and business-level types (protocol types provided by SDK)
  */
 
 import type { Memory } from './types.js';
@@ -19,86 +19,7 @@ export const SERVER_INFO = {
 } as const;
 
 // ============================================================================
-// MCP Request/Response Types
-// ============================================================================
-
-/** JSON-RPC request ID */
-export type RequestId = string | number;
-
-/** Base JSON-RPC request structure */
-export interface JsonRpcRequest<T = unknown> {
-  jsonrpc: '2.0';
-  id?: RequestId;
-  method: string;
-  params?: T;
-}
-
-/** Base JSON-RPC response structure */
-export interface JsonRpcResponse<T = unknown> {
-  jsonrpc: '2.0';
-  id: RequestId | null;
-  result?: T;
-  error?: JsonRpcError;
-}
-
-/** JSON-RPC error structure */
-export interface JsonRpcError {
-  code: number;
-  message: string;
-  data?: unknown;
-}
-
-/** JSON-RPC notification (no response expected) */
-export interface JsonRpcNotification<T = unknown> {
-  jsonrpc: '2.0';
-  method: string;
-  params?: T;
-}
-
-// ============================================================================
-// MCP Lifecycle Messages
-// ============================================================================
-
-/** Initialize request parameters */
-export interface InitializeParams {
-  protocolVersion: string;
-  capabilities: ClientCapabilities;
-  clientInfo: Implementation;
-}
-
-/** Initialize result */
-export interface InitializeResult {
-  protocolVersion: string;
-  capabilities: ServerCapabilities;
-  serverInfo: Implementation;
-}
-
-/** Implementation information */
-export interface Implementation {
-  name: string;
-  version: string;
-}
-
-/** Client capabilities */
-export interface ClientCapabilities {
-  // Client can handle these features
-  readonly experimental?: Record<string, unknown>;
-  readonly roots?: { listChanged?: boolean };
-  readonly sampling?: Record<string, unknown>;
-}
-
-/** Server capabilities */
-export interface ServerCapabilities {
-  // Server provides these features
-  readonly experimental?: Record<string, unknown>;
-  readonly logging?: Record<string, unknown>;
-  readonly prompts?: { listChanged?: boolean };
-  readonly resources?: { subscribe?: boolean; listChanged?: boolean };
-  readonly tools?: { listChanged?: boolean };
-}
-
-// ============================================================================
-// MCP Tool Definitions
+// MCP Tool Definitions (kept for SDK use)
 // ============================================================================
 
 /** Tool definition for tool/list */
@@ -114,34 +35,6 @@ export interface ToolInputSchema {
   properties?: Record<string, unknown>;
   required?: string[];
   additionalProperties?: boolean;
-}
-
-/** Tool call request */
-export interface ToolCallRequest {
-  name: string;
-  arguments?: Record<string, unknown>;
-}
-
-/** Tool call result */
-export interface ToolCallResult {
-  content: ToolContent[];
-  isError?: boolean;
-}
-
-/** Tool content types */
-export type ToolContent = TextContent | ImageContent;
-
-/** Text content */
-export interface TextContent {
-  type: 'text';
-  text: string;
-}
-
-/** Image content */
-export interface ImageContent {
-  type: 'image';
-  data: string; // base64 encoded
-  mimeType: string;
 }
 
 // ============================================================================
@@ -209,40 +102,8 @@ export const TOOL_DEFINITIONS: readonly Tool[] = [
 ] as const;
 
 // ============================================================================
-// MCP Methods
+// Error Codes (MemHub Custom)
 // ============================================================================
-
-/** All MCP method names */
-export const MCP_METHODS = {
-  // Lifecycle
-  INITIALIZE: 'initialize',
-  INITIALIZED: 'notifications/initialized',
-  SHUTDOWN: 'shutdown',
-  EXIT: 'exit',
-
-  // Tools
-  TOOLS_LIST: 'tools/list',
-  TOOLS_CALL: 'tools/call',
-
-  // Logging
-  LOGGING_MESSAGE: 'notifications/message',
-
-  // Progress
-  PROGRESS: 'notifications/progress',
-} as const;
-
-// ============================================================================
-// Error Codes (Standard MCP + Custom)
-// ============================================================================
-
-/** Standard JSON-RPC error codes */
-export const JSONRPC_ERROR_CODES = {
-  PARSE_ERROR: -32700,
-  INVALID_REQUEST: -32600,
-  METHOD_NOT_FOUND: -32601,
-  INVALID_PARAMS: -32602,
-  INTERNAL_ERROR: -32603,
-} as const;
 
 /** MemHub custom error codes */
 export const MEMHUB_ERROR_CODES = {
@@ -252,9 +113,13 @@ export const MEMHUB_ERROR_CODES = {
   DUPLICATE_ERROR: -32004,
 } as const;
 
-/** Combined error codes */
+/** Combined error codes (includes JSON-RPC standard codes) */
 export const ERROR_CODES = {
-  ...JSONRPC_ERROR_CODES,
+  PARSE_ERROR: -32700,
+  INVALID_REQUEST: -32600,
+  METHOD_NOT_FOUND: -32601,
+  INVALID_PARAMS: -32602,
+  INTERNAL_ERROR: -32603,
   ...MEMHUB_ERROR_CODES,
 } as const;
 
