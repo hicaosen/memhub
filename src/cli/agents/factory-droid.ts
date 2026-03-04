@@ -7,7 +7,7 @@ export function generateFactoryDroidConfig(_memhubPath: string): Record<string, 
     mcpServers: {
       memhub: {
         command: 'npx',
-        args: ['-y', '@synth-coder/memhub'],
+        args: ['-y', '@synth-coder/memhub@latest'],
       },
     },
   };

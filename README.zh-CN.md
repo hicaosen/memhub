@@ -49,7 +49,7 @@ MemHub 将“用户决策、长期偏好、可复用知识”保存为 **Markdow
 - **Markdown 存储** — 人类可读的 `.md` 文件，带 YAML front matter
 - **Git 友好** — 版本控制、diff、审查你的记忆
 - **MCP 协议** — 支持 Claude Code、Cursor、Cline、Windsurf 等
-- **一键配置** — `npx -y @synth-coder/memhub init`
+- **一键配置** — `npx -y @synth-coder/memhub@latest init`
 
 ---
 
@@ -60,7 +60,7 @@ MemHub 将“用户决策、长期偏好、可复用知识”保存为 **Markdow
 使用一条命令为你的 AI 代理配置 MemHub：
 
 ```bash
-npx -y @synth-coder/memhub init
+npx -y @synth-coder/memhub@latest init
 ```
 
 这将启动交互式提示选择你的代理。MemHub 会：
@@ -83,16 +83,16 @@ npx -y @synth-coder/memhub init
 
 ```bash
 # 交互式选择（全局 - 默认）
-npx -y @synth-coder/memhub init
+npx -y @synth-coder/memhub@latest init
 
 # 跳过交互式提示
-npx -y @synth-coder/memhub init -a claude-code
+npx -y @synth-coder/memhub@latest init -a claude-code
 
 # 仅配置当前项目（本地）
-npx -y @synth-coder/memhub init -a cursor -l
+npx -y @synth-coder/memhub@latest init -a cursor -l
 
 # 更新现有配置
-npx -y @synth-coder/memhub init -a claude-code --force
+npx -y @synth-coder/memhub@latest init -a claude-code --force
 ```
 
 | 选项 | 说明 |
@@ -108,7 +108,7 @@ npx -y @synth-coder/memhub init -a claude-code --force
 ### 方式 A：npx 直接运行（推荐）
 
 ```bash
-npx -y @synth-coder/memhub
+npx -y @synth-coder/memhub@latest
 ```
 
 > Windows 下不要在包名后再加 `memhub` 参数。
@@ -121,7 +121,7 @@ npx -y @synth-coder/memhub
   "mcpServers": {
     "memhub": {
       "command": "npx",
-      "args": ["-y", "@synth-coder/memhub"],
+      "args": ["-y", "@synth-coder/memhub@latest"],
       "env": {
         "MEMHUB_STORAGE_PATH": "/绝对路径/你的记忆目录",
         "MEMHUB_LOG_LEVEL": "info"
@@ -129,6 +129,14 @@ npx -y @synth-coder/memhub
     }
   }
 }
+```
+
+如果是 Codex（`~/.codex/config.toml`），请使用 TOML 键 `mcp_servers`：
+
+```toml
+[mcp_servers.memhub]
+command = "npx"
+args = ["-y", "@synth-coder/memhub@latest"]
 ```
 
 ### 方式 B：本地仓库运行
@@ -236,7 +244,7 @@ memhub/
 - [x] CLI init 命令快速配置
 - [ ] 集成测试
 - [ ] 性能优化
-- [x] npm 发布（`@synth-coder/memhub@0.2.3`）
+- [x] npm 发布（`@synth-coder/memhub@0.2.5`）
 
 ---
 

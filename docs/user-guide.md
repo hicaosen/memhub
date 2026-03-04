@@ -9,7 +9,7 @@ MemHub is a Git-friendly memory system for AI coding agents. It helps your AI re
 Configure MemHub for your AI agent with one command:
 
 ```bash
-npx -y @synth-coder/memhub init
+npx -y @synth-coder/memhub@latest init
 ```
 
 This will:
@@ -29,20 +29,22 @@ This will:
 | Gemini CLI    | `~/.gemini/settings.json`             | `.gemini/settings.json`             |
 | Codex         | `~/.codex/config.toml`                | `.codex/config.toml`                |
 
+Note: Codex config uses TOML key `mcp_servers` (not `mcpServers`).
+
 ### CLI Options
 
 ```bash
 # Interactive selection (global - default)
-npx -y @synth-coder/memhub init
+npx -y @synth-coder/memhub@latest init
 
 # Specify agent
-npx -y @synth-coder/memhub init -a claude-code
+npx -y @synth-coder/memhub@latest init -a claude-code
 
 # Configure for current project only (local)
-npx -y @synth-coder/memhub init -a cursor -l
+npx -y @synth-coder/memhub@latest init -a cursor -l
 
 # Update existing configuration
-npx -y @synth-coder/memhub init -a claude-code --force
+npx -y @synth-coder/memhub@latest init -a claude-code --force
 ```
 
 | Option               | Description                                     |
@@ -95,7 +97,7 @@ By default, memories are stored in `~/.memhub/` (global) or `./memories/` (local
 
 ```bash
 # Custom storage location
-MEMHUB_STORAGE_PATH=/path/to/memories npx -y @synth-coder/memhub
+MEMHUB_STORAGE_PATH=/path/to/memories npx -y @synth-coder/memhub@latest
 ```
 
 ### File Format

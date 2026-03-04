@@ -7,7 +7,7 @@ export function generateClineConfig(_memhubPath: string): Record<string, unknown
     mcpServers: {
       memhub: {
         command: 'npx',
-        args: ['-y', '@synth-coder/memhub'],
+        args: ['-y', '@synth-coder/memhub@latest'],
       },
     },
   };

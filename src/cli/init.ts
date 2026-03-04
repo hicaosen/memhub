@@ -62,6 +62,14 @@ function stringifyConfig(
   return JSON.stringify(config, null, 2);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function getTargetMcpKey(config: Record<string, unknown>): 'mcpServers' | 'mcp_servers' {
+  return isRecord(config.mcp_servers) ? 'mcp_servers' : 'mcpServers';
+}
+
 /**
  * Merge memhub config into existing config
  * Preserves all existing servers, adds/updates memhub
@@ -71,19 +79,10 @@ function mergeMcpConfig(
   newConfig: Record<string, unknown>
 ): Record<string, unknown> {
   const result = { ...existing };
-
-  // Ensure mcpServers object exists
-  if (typeof result.mcpServers !== 'object' || result.mcpServers === null) {
-    result.mcpServers = {};
-  }
-
-  // Merge memhub server
-  const existingServers = result.mcpServers as Record<string, unknown>;
-  const newServers = newConfig.mcpServers as Record<string, unknown>;
-
-  for (const [serverName, serverConfig] of Object.entries(newServers)) {
-    existingServers[serverName] = serverConfig;
-  }
+  const targetKey = getTargetMcpKey(newConfig);
+  const existingServers = isRecord(result[targetKey]) ? result[targetKey] : {};
+  const newServers = (newConfig[targetKey] as Record<string, unknown>) ?? {};
+  result[targetKey] = { ...existingServers, ...newServers };
 
   return result;
 }
@@ -158,7 +157,8 @@ export function initAgent(options: InitOptions): InitOutcome {
       try {
         const existingContent = readFileSync(configPath, 'utf-8');
         const existingConfig = parseConfig(existingContent, configFormat);
-        const servers = existingConfig.mcpServers as Record<string, unknown> | undefined;
+        const targetKey = getTargetMcpKey(newConfig);
+        const servers = existingConfig[targetKey] as Record<string, unknown> | undefined;
 
         if (servers && 'memhub' in servers) {
           return {

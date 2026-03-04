@@ -7,7 +7,7 @@ export function generateClaudeCodeConfig(_memhubPath: string): Record<string, un
     mcpServers: {
       memhub: {
         command: 'npx',
-        args: ['-y', '@synth-coder/memhub'],
+        args: ['-y', '@synth-coder/memhub@latest'],
       },
     },
   };
