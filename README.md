@@ -36,18 +36,18 @@ npm i @synth-coder/memhub
 ### 2) Or install dependencies for local development
 
 ```bash
-npm install
+npx pnpm install
 ```
 
 ### 3) Build
 
 ```bash
-npm run build
+npx pnpm run build
 ```
 
 ### 4) Run quality gate
 ```bash
-npm run quality
+npx pnpm run quality
 ```
 
 ---
@@ -97,7 +97,7 @@ Example MCP client config:
 
 ## Environment Variables
 
-- `MEMHUB_STORAGE_PATH` (default: `./memories`)
+- `MEMHUB_STORAGE_PATH` (default: `~/.memhub`)
 - `MEMHUB_LOG_LEVEL` (default: `info`, options: `debug|info|warn|error`)
 
 ---
@@ -140,17 +140,57 @@ Calling policy: see `docs/tool-calling-policy.md`.
 
 ---
 
+## Configure Your Agent
+
+Add the following to your coding agent's system prompt to enable persistent memory:
+
+```markdown
+## Memory System
+
+You have access to persistent memory across conversations. Use it wisely:
+
+- **Remember preferences** — Learn what the user likes and avoid repeating mistakes
+- **Recall decisions** — Build on past reasoning instead of starting from scratch
+- **Store context** — Project knowledge that survives session boundaries
+
+### When to Use
+
+#### `memory_load`
+
+Call when you need context from past conversations:
+- User references something from before
+- You're unsure about user preferences
+- A decision needs historical context
+
+Don't call for simple, self-contained tasks.
+
+#### `memory_update`
+
+Call when you discover something worth remembering:
+- User expresses a preference
+- You made a significant decision with reasoning
+- Project context changed
+
+Don't call for temporary or one-time information.
+
+### Principle
+
+Memory should feel natural — triggered by context, not by schedule. When in doubt, ask: "Would future me benefit from knowing this?"
+```
+
+---
+
 ## Development
 
 ### Scripts
 
 ```bash
-npm run build
-npm run lint
-npm run typecheck
-npm run test
-npm run test:coverage
-npm run quality
+npx pnpm run build
+npx pnpm run lint
+npx pnpm run typecheck
+npx pnpm run test
+npx pnpm run test:coverage
+npx pnpm run quality
 ```
 
 ### Engineering Workflow
@@ -186,7 +226,7 @@ memhub/
 - [x] Quality gate (lint/typecheck/test/coverage)
 - [ ] Integration tests
 - [ ] Performance improvements
-- [x] npm release (`@synth-coder/memhub@0.2.0`)
+- [x] npm release (`@synth-coder/memhub@0.2.3`)
 
 ---
 
