@@ -106,7 +106,7 @@ export class MemoryService {
           await initPromise;
           return resolvedVectorIndex!.upsert(memory, vector);
         },
-        delete: async (id) => {
+        delete: async id => {
           await initPromise;
           return resolvedVectorIndex!.delete(id);
         },
@@ -121,7 +121,7 @@ export class MemoryService {
           await initPromise;
           return resolvedEmbedding!.embedMemory(title, content);
         },
-        embed: async (text) => {
+        embed: async text => {
           await initPromise;
           return resolvedEmbedding!.embed(text);
         },
@@ -312,9 +312,7 @@ export class MemoryService {
       let memories: Memory[] = [];
       for (const file of files) {
         try {
-          const memory = await this.storage.read(
-            this.extractIdFromContent(file.content)
-          );
+          const memory = await this.storage.read(this.extractIdFromContent(file.content));
           memories.push(memory);
         } catch {
           continue;
@@ -325,9 +323,7 @@ export class MemoryService {
         memories = memories.filter(m => m.category === input.category);
       }
       if (input.tags && input.tags.length > 0) {
-        memories = memories.filter(m =>
-          input.tags!.every(tag => m.tags.includes(tag))
-        );
+        memories = memories.filter(m => input.tags!.every(tag => m.tags.includes(tag)));
       }
       if (input.fromDate) {
         memories = memories.filter(m => m.createdAt >= input.fromDate!);
@@ -385,10 +381,7 @@ export class MemoryService {
     if (this.vectorSearchEnabled && this.vectorIndex && this.embedding) {
       try {
         const queryVec = await this.embedding.embed(input.query);
-        const vectorResults = await this.vectorIndex.search(
-          queryVec,
-          input.limit ?? 10
-        );
+        const vectorResults = await this.vectorIndex.search(queryVec, input.limit ?? 10);
 
         const results: SearchResult[] = [];
         for (const vr of vectorResults) {

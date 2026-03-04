@@ -37,7 +37,9 @@ describe('MemoryService', () => {
 
       const result = await memoryService.create(input);
       expect(result.id).toBeDefined();
-      expect(result.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+      expect(result.id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      );
     });
 
     it('should create memory file with correct format', async () => {
@@ -168,8 +170,18 @@ describe('MemoryService', () => {
 
   describe('list', () => {
     beforeEach(async () => {
-      await memoryService.create({ title: 'Work 1', content: 'Content', category: 'work', tags: ['project'] });
-      await memoryService.create({ title: 'Work 2', content: 'Content', category: 'work', tags: ['meeting'] });
+      await memoryService.create({
+        title: 'Work 1',
+        content: 'Content',
+        category: 'work',
+        tags: ['project'],
+      });
+      await memoryService.create({
+        title: 'Work 2',
+        content: 'Content',
+        category: 'work',
+        tags: ['meeting'],
+      });
       await memoryService.create({ title: 'Personal', content: 'Content', category: 'personal' });
     });
 

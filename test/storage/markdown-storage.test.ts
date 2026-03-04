@@ -103,9 +103,9 @@ This is the content.
     });
 
     it('should throw error when file not found', async () => {
-      await expect(
-        storage.read('550e8400-e29b-41d4-a716-446655440000')
-      ).rejects.toThrow(StorageError);
+      await expect(storage.read('550e8400-e29b-41d4-a716-446655440000')).rejects.toThrow(
+        StorageError
+      );
     });
 
     it('should parse front matter correctly', async () => {
@@ -157,17 +157,23 @@ importance: 3
     });
 
     it('should throw error when file not found', async () => {
-      await expect(
-        storage.delete('550e8400-e29b-41d4-a716-446655440000')
-      ).rejects.toThrow(StorageError);
+      await expect(storage.delete('550e8400-e29b-41d4-a716-446655440000')).rejects.toThrow(
+        StorageError
+      );
     });
   });
 
   describe('list', () => {
     it('should list all memory files', async () => {
       const { writeFileSync } = await import('fs');
-      writeFileSync(join(tempDir, '2024-03-15-a.md'), '---\nid: "a"\ncreated_at: "2024-03-15T10:30:00Z"\nupdated_at: "2024-03-15T10:30:00Z"\ntags: []\ncategory: "general"\nimportance: 3\n---\n\n# A');
-      writeFileSync(join(tempDir, '2024-03-16-b.md'), '---\nid: "b"\ncreated_at: "2024-03-16T10:30:00Z"\nupdated_at: "2024-03-16T10:30:00Z"\ntags: []\ncategory: "general"\nimportance: 3\n---\n\n# B');
+      writeFileSync(
+        join(tempDir, '2024-03-15-a.md'),
+        '---\nid: "a"\ncreated_at: "2024-03-15T10:30:00Z"\nupdated_at: "2024-03-15T10:30:00Z"\ntags: []\ncategory: "general"\nimportance: 3\n---\n\n# A'
+      );
+      writeFileSync(
+        join(tempDir, '2024-03-16-b.md'),
+        '---\nid: "b"\ncreated_at: "2024-03-16T10:30:00Z"\nupdated_at: "2024-03-16T10:30:00Z"\ntags: []\ncategory: "general"\nimportance: 3\n---\n\n# B'
+      );
 
       const files = await storage.list();
       expect(files).toHaveLength(2);
@@ -180,7 +186,10 @@ importance: 3
 
     it('should only include .md files', async () => {
       const { writeFileSync } = await import('fs');
-      writeFileSync(join(tempDir, 'test.md'), '---\nid: "test"\ncreated_at: "2024-03-15T10:30:00Z"\nupdated_at: "2024-03-15T10:30:00Z"\ntags: []\ncategory: "general"\nimportance: 3\n---\n\n# Test');
+      writeFileSync(
+        join(tempDir, 'test.md'),
+        '---\nid: "test"\ncreated_at: "2024-03-15T10:30:00Z"\nupdated_at: "2024-03-15T10:30:00Z"\ntags: []\ncategory: "general"\nimportance: 3\n---\n\n# Test'
+      );
       writeFileSync(join(tempDir, 'test.txt'), 'not markdown');
 
       const files = await storage.list();

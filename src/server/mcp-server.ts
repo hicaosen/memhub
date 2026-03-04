@@ -10,15 +10,9 @@ import { fileURLToPath } from 'url';
 import { homedir } from 'os';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { MemoryService, ServiceError } from '../services/memory-service.js';
-import {
-  MemoryLoadInputSchema,
-  MemoryUpdateInputV2Schema,
-} from '../contracts/schemas.js';
+import { MemoryLoadInputSchema, MemoryUpdateInputV2Schema } from '../contracts/schemas.js';
 import { TOOL_DEFINITIONS, SERVER_INFO } from '../contracts/mcp.js';
 import { ErrorCode } from '../contracts/types.js';
 
@@ -90,7 +84,7 @@ export function createMcpServer(): Server {
   });
 
   // Handle tools/call request
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  server.setRequestHandler(CallToolRequestSchema, async request => {
     const { name, arguments: args } = request.params;
 
     try {
@@ -110,10 +104,7 @@ export function createMcpServer(): Server {
         }
 
         default:
-          throw new ServiceError(
-            `Unknown tool: ${name}`,
-            ErrorCode.METHOD_NOT_FOUND
-          );
+          throw new ServiceError(`Unknown tool: ${name}`, ErrorCode.METHOD_NOT_FOUND);
       }
 
       return {
@@ -168,7 +159,7 @@ async function main(): Promise<void> {
   console.error('MemHub MCP Server running on stdio');
 }
 
-main().catch((error) => {
+main().catch(error => {
   console.error('Fatal error:', error);
   process.exit(1);
 });
@@ -178,7 +169,7 @@ const isMain = import.meta.url === `file://${process.argv[1]}` || false;
 if (isMain) {
   // Defer main() execution to avoid blocking module loading
   setImmediate(() => {
-    main().catch((error) => {
+    main().catch(error => {
       console.error('Fatal error:', error);
       process.exit(1);
     });

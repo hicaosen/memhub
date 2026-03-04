@@ -50,7 +50,7 @@ sequenceDiagram
     participant EmbeddingService
     participant VectorIndex
     participant MarkdownStorage
-    
+
     User->>MemoryService: memory_load(query="架构设计")
     MemoryService->>EmbeddingService: embed("架构设计")
     EmbeddingService-->>MemoryService: [0.1, 0.2, ..., 0.384]
@@ -68,8 +68,8 @@ sequenceDiagram
 ```typescript
 // 语义搜索
 const result = await memoryService.memoryLoad({
-  query: "如何实现用户认证",
-  limit: 10
+  query: '如何实现用户认证',
+  limit: 10,
 });
 
 // 返回语义最相关的记忆
@@ -81,10 +81,10 @@ console.log(result.items);
 ```typescript
 // 语义搜索 + 元数据过滤
 const result = await memoryService.memoryLoad({
-  query: "数据库优化",
-  tags: ["performance", "backend"],
-  category: "engineering",
-  limit: 10
+  query: '数据库优化',
+  tags: ['performance', 'backend'],
+  category: 'engineering',
+  limit: 10,
 });
 ```
 
@@ -93,9 +93,9 @@ const result = await memoryService.memoryLoad({
 ```typescript
 // 限定在特定会话中搜索
 const result = await memoryService.memoryLoad({
-  query: "项目进度",
-  sessionId: "550e8400-e29b-41d4-a716-446655440000",
-  scope: "stm"
+  query: '项目进度',
+  sessionId: '550e8400-e29b-41d4-a716-446655440000',
+  scope: 'stm',
 });
 ```
 
@@ -120,6 +120,7 @@ MEMHUB_VECTOR_SEARCH=false
 ```
 
 禁用后：
+
 - `memory_load` 降级为纯元数据过滤
 - `memory_update` 不更新向量索引
 - 降低内存和磁盘占用
@@ -138,14 +139,14 @@ MEMHUB_VECTOR_SEARCH=false
 ```typescript
 class EmbeddingService {
   private static instance: EmbeddingService | null = null;
-  
+
   static getInstance(): EmbeddingService {
     if (!this.instance) {
       this.instance = new EmbeddingService();
     }
     return this.instance;
   }
-  
+
   async embed(text: string): Promise<number[]> {
     // 返回 384 维归一化向量
   }
@@ -161,10 +162,10 @@ class EmbeddingService {
 const service = EmbeddingService.getInstance();
 
 // 首次调用 embed() 时加载模型
-const vector = await service.embed("some text");
+const vector = await service.embed('some text');
 
 // 后续调用复用已加载的模型
-const vector2 = await service.embed("another text");
+const vector2 = await service.embed('another text');
 ```
 
 ## Vector Index

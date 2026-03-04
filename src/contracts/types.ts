@@ -25,10 +25,10 @@ export type Slug = string;
  * Content is split between YAML Front Matter (metadata) and Markdown body
  */
 export type MemoryEntryType =
-  | 'preference'  // User likes/dislikes
-  | 'decision'    // Technical choices with reasoning
-  | 'context'     // Project/environment information
-  | 'fact';       // Objective knowledge
+  | 'preference' // User likes/dislikes
+  | 'decision' // Technical choices with reasoning
+  | 'context' // Project/environment information
+  | 'fact'; // Objective knowledge
 
 export interface Memory {
   /** UUID v4 unique identifier */

@@ -13,6 +13,7 @@ You have access to persistent memory across conversations. Use it wisely:
 ### `memory_load`
 
 Call when you need context from past conversations:
+
 - User references something from before
 - You're unsure about user preferences
 - A decision needs historical context
@@ -22,6 +23,7 @@ Don't call for simple, self-contained tasks.
 ### `memory_update`
 
 Call when you discover something worth remembering:
+
 - User expresses a preference
 - You made a significant decision with reasoning
 - Project context changed

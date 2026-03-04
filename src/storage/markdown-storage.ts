@@ -2,15 +2,7 @@
  * Markdown Storage - Handles file system operations for memory storage
  */
 
-import {
-  readFile,
-  writeFile,
-  unlink,
-  readdir,
-  stat,
-  access,
-  mkdir,
-} from 'fs/promises';
+import { readFile, writeFile, unlink, readdir, stat, access, mkdir } from 'fs/promises';
 import { join, extname } from 'path';
 import { constants } from 'fs';
 import type { Memory, MemoryFile } from '../contracts/types.js';

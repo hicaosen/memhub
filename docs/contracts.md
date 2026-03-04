@@ -24,11 +24,11 @@
 
 ```ts
 interface MemoryLoadInput {
-  id?: string;                 // 指定单条记忆 ID（优先级最高）
-  query?: string;              // 语义搜索查询（启用向量搜索）
-  category?: string;           // 分类过滤
-  tags?: string[];             // 标签过滤
-  limit?: number;              // 返回数量限制，默认 20
+  id?: string; // 指定单条记忆 ID（优先级最高）
+  query?: string; // 语义搜索查询（启用向量搜索）
+  category?: string; // 分类过滤
+  tags?: string[]; // 标签过滤
+  limit?: number; // 返回数量限制，默认 20
 }
 ```
 
@@ -74,15 +74,15 @@ interface MemoryLoadOutput {
 type EntryType = 'preference' | 'decision' | 'context' | 'fact';
 
 interface MemoryUpdateInput {
-  id?: string;                 // 有则更新；无则创建新记录
-  sessionId?: string;          // 无则服务端自动生成并返回
-  mode?: 'append' | 'upsert';  // 默认 append
-  entryType?: EntryType;       // 记忆类型
-  title?: string;              // 标题（Markdown H1）
-  content: string;             // 内容（必填，Markdown 格式）
-  tags?: string[];             // 标签数组
-  category?: string;           // 分类
-  importance?: number;         // 重要性 1-5，默认 3
+  id?: string; // 有则更新；无则创建新记录
+  sessionId?: string; // 无则服务端自动生成并返回
+  mode?: 'append' | 'upsert'; // 默认 append
+  entryType?: EntryType; // 记忆类型
+  title?: string; // 标题（Markdown H1）
+  content: string; // 内容（必填，Markdown 格式）
+  tags?: string[]; // 标签数组
+  category?: string; // 分类
+  importance?: number; // 重要性 1-5，默认 3
 }
 ```
 
@@ -127,16 +127,16 @@ interface MemoryUpdateOutput {
 type EntryType = 'preference' | 'decision' | 'context' | 'fact';
 
 interface Memory {
-  id: string;                  // UUID v4
-  createdAt: string;           // ISO 8601
-  updatedAt: string;           // ISO 8601
-  sessionId?: string;          // 会话 UUID
-  entryType?: EntryType;       // 记忆类型
-  tags: string[];              // 标签数组
-  category: string;            // 分类
-  importance: number;          // 1-5
-  title: string;               // Markdown H1 标题
-  content: string;             // Markdown 正文
+  id: string; // UUID v4
+  createdAt: string; // ISO 8601
+  updatedAt: string; // ISO 8601
+  sessionId?: string; // 会话 UUID
+  entryType?: EntryType; // 记忆类型
+  tags: string[]; // 标签数组
+  category: string; // 分类
+  importance: number; // 1-5
+  title: string; // Markdown H1 标题
+  content: string; // Markdown 正文
 }
 ```
 

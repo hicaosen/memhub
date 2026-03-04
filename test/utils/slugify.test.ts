@@ -62,7 +62,11 @@ describe('generateUniqueSlug', () => {
   });
 
   it('should increment counter until unique', () => {
-    const result = generateUniqueSlug('hello world', ['hello-world', 'hello-world-1', 'hello-world-2']);
+    const result = generateUniqueSlug('hello world', [
+      'hello-world',
+      'hello-world-1',
+      'hello-world-2',
+    ]);
     expect(result).toBe('hello-world-3');
   });
 });

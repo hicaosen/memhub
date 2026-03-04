@@ -203,7 +203,8 @@ describe('McpServer (SDK)', () => {
       const cwd = process.platform === 'win32' ? 'C:\\myproject' : '/myproject';
       process.cwd = () => cwd;
       process.env.MEMHUB_STORAGE_PATH = '.memhub';
-      const expected = process.platform === 'win32' ? 'C:\\myproject\\.memhub' : '/myproject/.memhub';
+      const expected =
+        process.platform === 'win32' ? 'C:\\myproject\\.memhub' : '/myproject/.memhub';
       expect(resolveStoragePath()).toBe(expected);
     });
   });

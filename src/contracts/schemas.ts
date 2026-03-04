@@ -41,10 +41,10 @@ export const ImportanceSchema = z.number().int().min(1).max(5);
 
 /** STM memory entry type */
 export const MemoryEntryTypeSchema = z.enum([
-  'preference',  // User likes/dislikes
-  'decision',    // Technical choices with reasoning
-  'context',     // Project/environment information
-  'fact',        // Objective knowledge
+  'preference', // User likes/dislikes
+  'decision', // Technical choices with reasoning
+  'context', // Project/environment information
+  'fact', // Objective knowledge
 ]);
 
 // ============================================================================
