@@ -9,6 +9,7 @@ import type {
   MemoryUpdateOutput,
 } from '../contracts/types.js';
 import { MemoryService } from '../services/memory-service.js';
+import { createLogger, type Logger } from '../utils/logger.js';
 
 const PROTOCOL_VERSION = 1;
 const LOOPBACK_HOST = '127.0.0.1';
@@ -83,6 +84,7 @@ export class SharedMemoryBackend implements MemoryBackend {
   private readonly localService: MemoryService;
   private readonly lockPath: string;
   private readonly endpointPath: string;
+  private readonly logger: Logger;
   private role: BackendRole | null = null;
   private server: ReturnType<typeof createServer> | null = null;
   private endpoint: DaemonEndpoint | null = null;
@@ -92,6 +94,7 @@ export class SharedMemoryBackend implements MemoryBackend {
       storagePath: config.storagePath,
       vectorSearch: config.vectorSearch,
     });
+    this.logger = createLogger({ role: 'client' });
 
     this.lockPath = join(config.storagePath, '.memhub-daemon.lock');
     this.endpointPath = join(config.storagePath, '.memhub-daemon.json');
@@ -101,57 +104,176 @@ export class SharedMemoryBackend implements MemoryBackend {
     if (this.role) return;
     await fs.mkdir(dirname(this.lockPath), { recursive: true });
     await this.electRole();
+    await this.logger.info('backend.initialize', 'Shared memory backend initialized', {
+      meta: { role: this.role },
+    });
   }
 
   async memoryLoad(input: MemoryLoadInput): Promise<MemoryLoadOutput> {
     await this.initialize();
+    const requestId = randomUUID();
+    const start = Date.now();
+    await this.logger.info('memory_load.start', 'memory_load request started', {
+      requestId,
+      meta: {
+        hasId: !!input.id,
+        hasQuery: !!input.query,
+        category: input.category,
+        tagsCount: input.tags?.length ?? 0,
+      },
+    });
 
     if (this.role === 'daemon') {
-      return this.localService.memoryLoad(input);
+      try {
+        const result = await this.localService.memoryLoad(input);
+        await this.logger.info('memory_load.success', 'memory_load served locally by daemon', {
+          requestId,
+          durationMs: Date.now() - start,
+          meta: { items: result.total },
+        });
+        return result;
+      } catch (error) {
+        await this.logger.error('memory_load.fail', 'memory_load failed on daemon', {
+          requestId,
+          durationMs: Date.now() - start,
+          meta: { error: error instanceof Error ? error.message : 'Unknown error' },
+        });
+        throw error;
+      }
     }
 
     try {
-      return (await this.sendRequest({
+      const result = (await this.sendRequest({
         id: randomUUID(),
         method: 'memory_load',
         params: input,
       })) as MemoryLoadOutput;
+      await this.logger.info('memory_load.success', 'memory_load served via daemon IPC', {
+        requestId,
+        durationMs: Date.now() - start,
+        meta: { items: result.total },
+      });
+      return result;
     } catch {
+      await this.logger.warn('memory_load.retry', 'memory_load failed, trying daemon failover', {
+        requestId,
+      });
       await this.recoverFromDaemonFailure();
       if (this.role !== 'client') {
-        return this.localService.memoryLoad(input);
+        const result = await this.localService.memoryLoad(input);
+        await this.logger.info('memory_load.success', 'memory_load served after daemon failover', {
+          requestId,
+          durationMs: Date.now() - start,
+          meta: { items: result.total },
+        });
+        return result;
       }
-      return (await this.sendRequest({
+      const result = (await this.sendRequest({
         id: randomUUID(),
         method: 'memory_load',
         params: input,
       })) as MemoryLoadOutput;
+      await this.logger.info(
+        'memory_load.success',
+        'memory_load served via daemon IPC after failover',
+        {
+          requestId,
+          durationMs: Date.now() - start,
+          meta: { items: result.total },
+        }
+      );
+      return result;
     }
   }
 
   async memoryUpdate(input: MemoryUpdateInput): Promise<MemoryUpdateOutput> {
     await this.initialize();
+    const requestId = randomUUID();
+    const start = Date.now();
+    await this.logger.info('memory_update.start', 'memory_update request started', {
+      requestId,
+      sessionId: input.sessionId,
+      meta: {
+        hasId: !!input.id,
+        entryType: input.entryType,
+        category: input.category,
+        tagsCount: input.tags?.length ?? 0,
+      },
+    });
 
     if (this.role === 'daemon') {
-      return this.localService.memoryUpdate(input);
+      try {
+        const result = await this.localService.memoryUpdate(input);
+        await this.logger.info('memory_update.success', 'memory_update served locally by daemon', {
+          requestId,
+          sessionId: result.sessionId,
+          durationMs: Date.now() - start,
+          meta: { id: result.id, created: result.created, updated: result.updated },
+        });
+        return result;
+      } catch (error) {
+        await this.logger.error('memory_update.fail', 'memory_update failed on daemon', {
+          requestId,
+          sessionId: input.sessionId,
+          durationMs: Date.now() - start,
+          meta: { error: error instanceof Error ? error.message : 'Unknown error' },
+        });
+        throw error;
+      }
     }
 
     try {
-      return (await this.sendRequest({
+      const result = (await this.sendRequest({
         id: randomUUID(),
         method: 'memory_update',
         params: input,
       })) as MemoryUpdateOutput;
+      await this.logger.info('memory_update.success', 'memory_update served via daemon IPC', {
+        requestId,
+        sessionId: result.sessionId,
+        durationMs: Date.now() - start,
+        meta: { id: result.id, created: result.created, updated: result.updated },
+      });
+      return result;
     } catch {
+      await this.logger.warn(
+        'memory_update.retry',
+        'memory_update failed, trying daemon failover',
+        {
+          requestId,
+        }
+      );
       await this.recoverFromDaemonFailure();
       if (this.role !== 'client') {
-        return this.localService.memoryUpdate(input);
+        const result = await this.localService.memoryUpdate(input);
+        await this.logger.info(
+          'memory_update.success',
+          'memory_update served after daemon failover',
+          {
+            requestId,
+            sessionId: result.sessionId,
+            durationMs: Date.now() - start,
+            meta: { id: result.id, created: result.created, updated: result.updated },
+          }
+        );
+        return result;
       }
-      return (await this.sendRequest({
+      const result = (await this.sendRequest({
         id: randomUUID(),
         method: 'memory_update',
         params: input,
       })) as MemoryUpdateOutput;
+      await this.logger.info(
+        'memory_update.success',
+        'memory_update served via daemon IPC after failover',
+        {
+          requestId,
+          sessionId: result.sessionId,
+          durationMs: Date.now() - start,
+          meta: { id: result.id, created: result.created, updated: result.updated },
+        }
+      );
+      return result;
     }
   }
 
@@ -167,6 +289,9 @@ export class SharedMemoryBackend implements MemoryBackend {
       await safeUnlink(this.endpointPath);
       await safeUnlink(this.lockPath);
     }
+    await this.logger.info('backend.close', 'Shared memory backend closed', {
+      meta: { role: this.role },
+    });
 
     this.role = null;
     this.endpoint = null;
@@ -181,11 +306,17 @@ export class SharedMemoryBackend implements MemoryBackend {
 
     if (becameDaemon) {
       this.role = 'daemon';
+      this.logger.setRole('daemon');
+      await this.logger.info('daemon.elected', 'Current process elected as daemon');
       return;
     }
 
     this.role = 'client';
+    this.logger.setRole('client');
     this.endpoint = await this.waitForEndpoint();
+    await this.logger.info('daemon.connected', 'Connected to existing daemon', {
+      meta: { endpoint: this.endpoint },
+    });
   }
 
   private async tryBecomeDaemon(): Promise<boolean> {
@@ -193,6 +324,9 @@ export class SharedMemoryBackend implements MemoryBackend {
 
     try {
       await fs.writeFile(this.lockPath, lockPayload, { encoding: 'utf8', flag: 'wx' });
+      await this.logger.info('lock.acquire', 'Acquired daemon election lock', {
+        meta: { lockPath: this.lockPath },
+      });
     } catch (error) {
       const alreadyExists =
         !!error &&
@@ -206,6 +340,7 @@ export class SharedMemoryBackend implements MemoryBackend {
       if (!staleRecovered) return false;
 
       await fs.writeFile(this.lockPath, lockPayload, { encoding: 'utf8', flag: 'wx' });
+      await this.logger.warn('lock.recovered', 'Recovered stale daemon lock and acquired it');
     }
 
     try {
@@ -213,6 +348,9 @@ export class SharedMemoryBackend implements MemoryBackend {
       this.endpoint = endpoint;
       await fs.writeFile(this.endpointPath, JSON.stringify(endpoint), 'utf8');
       this.registerExitHooks();
+      await this.logger.info('daemon.ready', 'Daemon endpoint published', {
+        meta: { endpoint },
+      });
       return true;
     } catch (error) {
       await safeUnlink(this.lockPath);
@@ -239,6 +377,7 @@ export class SharedMemoryBackend implements MemoryBackend {
     if (stale) {
       await safeUnlink(this.lockPath);
       await safeUnlink(this.endpointPath);
+      await this.logger.warn('lock.stale_recovered', 'Recovered stale daemon lock');
       return true;
     }
 
@@ -259,6 +398,10 @@ export class SharedMemoryBackend implements MemoryBackend {
         if (!isProcessAlive(endpoint.pid)) {
           await safeUnlink(this.lockPath);
           await safeUnlink(this.endpointPath);
+          await this.logger.warn(
+            'daemon.dead',
+            'Discovered dead daemon endpoint, triggering election'
+          );
           break;
         }
 
@@ -328,6 +471,7 @@ export class SharedMemoryBackend implements MemoryBackend {
     } catch {
       const response: DaemonResponse = { id: 'unknown', ok: false, error: 'Invalid JSON request' };
       socket.write(`${JSON.stringify(response)}\n`);
+      await this.logger.error('ipc.request.invalid', 'Received invalid daemon request JSON');
       return;
     }
 
@@ -339,6 +483,10 @@ export class SharedMemoryBackend implements MemoryBackend {
 
       const response: DaemonResponse = { id: request.id, ok: true, result };
       socket.write(`${JSON.stringify(response)}\n`);
+      await this.logger.info('ipc.response', 'Daemon request served', {
+        requestId: request.id,
+        meta: { method: request.method },
+      });
     } catch (error) {
       const response: DaemonResponse = {
         id: request.id,
@@ -346,6 +494,10 @@ export class SharedMemoryBackend implements MemoryBackend {
         error: error instanceof Error ? error.message : 'Unknown daemon error',
       };
       socket.write(`${JSON.stringify(response)}\n`);
+      await this.logger.error('ipc.response.fail', 'Daemon request failed', {
+        requestId: request.id,
+        meta: { method: request.method, error: response.error },
+      });
     }
   }
 
@@ -367,6 +519,10 @@ export class SharedMemoryBackend implements MemoryBackend {
 
       socket.on('error', error => {
         clearTimeout(timeout);
+        void this.logger.error('ipc.request.fail', 'Daemon request socket error', {
+          requestId: request.id,
+          meta: { error: error.message },
+        });
         reject(error);
       });
 
@@ -406,6 +562,10 @@ export class SharedMemoryBackend implements MemoryBackend {
       });
 
       socket.connect(endpoint.port, endpoint.host, () => {
+        void this.logger.info('ipc.request', 'Sending daemon request', {
+          requestId: request.id,
+          meta: { method: request.method, endpoint },
+        });
         socket.write(`${JSON.stringify(request)}\n`);
       });
     });
@@ -413,14 +573,21 @@ export class SharedMemoryBackend implements MemoryBackend {
 
   private async recoverFromDaemonFailure(): Promise<void> {
     this.endpoint = null;
+    await this.logger.warn('daemon.failover', 'Attempting daemon failover recovery');
 
     if (await this.tryBecomeDaemon()) {
       this.role = 'daemon';
+      this.logger.setRole('daemon');
+      await this.logger.warn('daemon.failover.promoted', 'Promoted current process to daemon');
       return;
     }
 
     this.role = 'client';
+    this.logger.setRole('client');
     this.endpoint = await this.waitForEndpoint();
+    await this.logger.info('daemon.failover.connected', 'Connected to replacement daemon', {
+      meta: { endpoint: this.endpoint },
+    });
   }
 
   private registerExitHooks(): void {
