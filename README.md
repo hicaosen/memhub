@@ -6,11 +6,50 @@ Git-friendly memory MCP server for coding agents.
 
 ## Quick Start
 
-### Install from npm
+### One-Line Setup
+
+Configure MemHub for your AI agent with a single command:
 
 ```bash
-npm i @synth-coder/memhub
+npx -y @synth-coder/memhub init
 ```
+
+This launches an interactive prompt to select your agent. MemHub will:
+1. Add MCP server config to your agent's configuration file
+2. Add MemHub usage instructions to your agent's rules file
+
+**Supported Agents:**
+
+| Agent | Config File | Instructions File |
+|-------|-------------|-------------------|
+| Claude Code | `~/.claude/settings.json` | `~/.claude/CLAUDE.md` |
+| Cursor | `~/.cursor/mcp.json` | `~/.cursorrules` |
+| Cline | `~/.cline/mcp.json` | `~/.clinerules` |
+| Windsurf | `~/.codeium/windsurf/mcp_config.json` | `~/.windsurfrules` |
+| Factory Droid | `~/.factory/mcp.json` | `~/.factory/AGENTS.md` |
+| Gemini CLI | `~/.gemini/settings.json` | `~/.gemini/GEMINI.md` |
+
+### CLI Options
+
+```bash
+# Interactive selection (global - default)
+npx -y @synth-coder/memhub init
+
+# Skip interactive prompt
+npx -y @synth-coder/memhub init -a claude-code
+
+# Configure for current project only (local)
+npx -y @synth-coder/memhub init -a cursor -l
+
+# Update existing configuration
+npx -y @synth-coder/memhub init -a claude-code --force
+```
+
+| Option | Description |
+|--------|-------------|
+| `-a, --agent <name>` | Agent type (skip interactive) |
+| `-l, --local` | Configure for current project (default: global) |
+| `-f, --force` | Update existing configuration |
 
 ### Run as MCP Server
 
@@ -20,7 +59,9 @@ npx -y @synth-coder/memhub
 
 > On Windows, do **not** append `memhub` after the package name.
 
-### Configure MCP Client
+### Manual Configuration
+
+If you prefer manual setup, add this to your MCP client config:
 
 ```json
 {
@@ -86,26 +127,54 @@ Memory should feel natural — triggered by context, not by schedule. When in do
 - `memory_update`  
   Final-turn tool. Write back decisions, preferences, knowledge, and task-state updates.
 
-Calling policy: see `docs/tool-calling-policy.md`.
+See [docs/mcp-tools.md](docs/mcp-tools.md) for detailed API reference.
 
 ---
 
 ## Why MemHub
 
-- **Git-native**: all memory is plain text files
-- **Agent-friendly**: exposed as MCP tools over stdio
-- **Human-readable**: YAML metadata + Markdown body
-- **Quality-gated**: lint + typecheck + tests + coverage gate
+Most AI memory tools rely on external APIs or simple keyword matching. MemHub is different:
+
+### Semantic Search with Local AI
+
+- **Vector Database**: Powered by LanceDB for fast similarity search
+- **Local Embeddings**: Quantized Transformers.js model runs entirely on your machine
+- **Zero API Costs**: No external services, no API keys, no rate limits
+- **Privacy First**: Your memories never leave your computer
+
+### Git-Native Storage
+
+- **Plain Text**: All memories are Markdown files with YAML front matter
+- **Version Control**: Commit, branch, review, and revert like any code
+- **Human Readable**: Browse and edit memories with any text editor
+- **Team Friendly**: Share memories via git repository
+
+### How It Works
+
+```
+User Query → Local Embedding Model → Vector Search → Ranked Results
+                    ↑                         ↓
+              Runs on CPU              LanceDB Index
+            (no GPU required)         (embedded database)
+```
+
+When you call `memory_load`, MemHub:
+1. Converts your query to a vector using a local quantized model
+2. Searches the LanceDB index for semantically similar memories
+3. Returns ranked results with relevance scores
+
+This means "testing framework preference" finds memories about "Vitest vs Jest decision" — even without exact keyword matches.
 
 ---
 
 ## Features
 
-- Markdown-based memory storage (`.md`)
-- YAML Front Matter metadata (`id`, `session_id`, `entry_type`, `tags`, `category`, `importance`, timestamps)
-- STM-first 2-tool interface: `memory_load` + `memory_update`
-- Concurrent CLI-safe storage layout: `YYYY-MM-DD/session_uuid/...`
-- MCP stdio server compatible with MCP clients
+- **Semantic Search** — Vector-based similarity search with LanceDB
+- **Local Embeddings** — Quantized Transformers.js model, runs on CPU
+- **Markdown Storage** — Human-readable `.md` files with YAML front matter
+- **Git-Friendly** — Version control, diff, review your memories
+- **MCP Protocol** — Works with Claude Code, Cursor, Cline, Windsurf, and more
+- **One-Line Setup** — `npx -y @synth-coder/memhub init`
 
 ---
 
@@ -194,6 +263,7 @@ memhub/
 - [x] Architecture and contracts
 - [x] Core storage/service/server implementation
 - [x] Quality gate (lint/typecheck/test/coverage)
+- [x] CLI init command for quick setup
 - [ ] Integration tests
 - [ ] Performance improvements
 - [x] npm release (`@synth-coder/memhub@0.2.3`)

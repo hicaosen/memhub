@@ -8,47 +8,97 @@ MemHub 将“用户决策、长期偏好、可复用知识”保存为 **Markdow
 
 ## 为什么用 MemHub
 
-- **Git 原生**：所有记忆都是纯文本文件，天然可 diff / 可回滚
-- **面向 Agent**：通过 MCP（stdio）暴露工具，便于模型调用
-- **人类可读**：元数据在 YAML，正文在 Markdown
-- **质量可控**：内置 lint / typecheck / test / coverage 门禁
+大多数 AI 记忆工具依赖外部 API 或简单的关键词匹配。MemHub 不同：
+
+### 本地 AI 语义搜索
+
+- **向量数据库**：基于 LanceDB 实现快速相似度搜索
+- **本地嵌入模型**：量化版 Transformers.js 模型，完全在本地运行
+- **零 API 成本**：无需外部服务、无需 API 密钥、无速率限制
+- **隐私优先**：你的记忆永远不会离开你的电脑
+
+### Git 原生存储
+
+- **纯文本格式**：所有记忆都是带 YAML front matter 的 Markdown 文件
+- **版本控制**：像代码一样提交、分支、审查、回滚
+- **人类可读**：用任何文本编辑器浏览和编辑记忆
+- **团队友好**：通过 git 仓库共享记忆
+
+### 工作原理
+
+```
+用户查询 → 本地嵌入模型 → 向量搜索 → 排序结果
+              ↑                    ↓
+        运行在 CPU           LanceDB 索引
+       (无需 GPU)           (嵌入式数据库)
+```
+
+当你调用 `memory_load` 时，MemHub：
+1. 使用本地量化模型将查询转换为向量
+2. 在 LanceDB 索引中搜索语义相似的记忆
+3. 返回带有相关性分数的排序结果
+
+这意味着"测试框架偏好"可以找到关于"Vitest vs Jest 决策"的记忆——即使没有精确的关键词匹配。
 
 ---
 
 ## 核心特性
 
-- Markdown 持久化（`.md`）
-- YAML Front Matter 元数据（`id / session_id / entry_type / tags / category / importance / 时间戳`）
-- STM-first 双工具接口：`memory_load` + `memory_update`
-- 并发 CLI 安全目录：`YYYY-MM-DD/session_uuid/...`
-- MCP stdio server，可接入主流 MCP 客户端
+- **语义搜索** — 基于 LanceDB 的向量相似度搜索
+- **本地嵌入** — 量化版 Transformers.js 模型，CPU 运行
+- **Markdown 存储** — 人类可读的 `.md` 文件，带 YAML front matter
+- **Git 友好** — 版本控制、diff、审查你的记忆
+- **MCP 协议** — 支持 Claude Code、Cursor、Cline、Windsurf 等
+- **一键配置** — `npx -y @synth-coder/memhub init`
 
 ---
 
 ## 快速开始
 
-### 1）从 npm 安装
+### 一键配置
+
+使用一条命令为你的 AI 代理配置 MemHub：
 
 ```bash
-npm i @synth-coder/memhub
+npx -y @synth-coder/memhub init
 ```
 
-### 2）本地开发安装依赖
+这将启动交互式提示选择你的代理。MemHub 会：
+1. 将 MCP 服务器配置添加到代理的配置文件
+2. 将 MemHub 使用说明添加到代理的规则文件
+
+**支持的代理：**
+
+| 代理 | 配置文件 | 指令文件 |
+|------|----------|----------|
+| Claude Code | `~/.claude/settings.json` | `~/.claude/CLAUDE.md` |
+| Cursor | `~/.cursor/mcp.json` | `~/.cursorrules` |
+| Cline | `~/.cline/mcp.json` | `~/.clinerules` |
+| Windsurf | `~/.codeium/windsurf/mcp_config.json` | `~/.windsurfrules` |
+| Factory Droid | `~/.factory/mcp.json` | `~/.factory/AGENTS.md` |
+| Gemini CLI | `~/.gemini/settings.json` | `~/.gemini/GEMINI.md` |
+
+### CLI 选项
 
 ```bash
-npm install
+# 交互式选择（全局 - 默认）
+npx -y @synth-coder/memhub init
+
+# 跳过交互式提示
+npx -y @synth-coder/memhub init -a claude-code
+
+# 仅配置当前项目（本地）
+npx -y @synth-coder/memhub init -a cursor -l
+
+# 更新现有配置
+npx -y @synth-coder/memhub init -a claude-code --force
 ```
 
-### 3）构建
-
-```bash
-npm run build
-```
-
-### 4）执行质量门禁
-```bash
-npm run quality
-```
+| 选项 | 说明 |
+|------|------|
+| `-a, --agent <名称>` | 代理类型（跳过交互式选择） |
+| `-l, --local` | 配置当前项目（默认：全局） |
+| `-f, --force` | 更新现有配置 |
 
 ---
 
@@ -131,7 +181,7 @@ YYYY-MM-DD-title-slug.md
 
 ## MCP 工具列表
 
-> 调用策略建议见：`docs/tool-calling-policy.md`（首轮 `memory_load`，末轮 `memory_update`）。
+> 详见 [docs/mcp-tools.md](docs/mcp-tools.md) 获取 API 参考。
 
 - `memory_load`：首轮加载短期记忆（STM）上下文
 - `memory_update`：末轮回写决策/偏好/知识/状态变化
@@ -182,9 +232,10 @@ memhub/
 - [x] 架构与契约设计
 - [x] 核心实现（storage/service/server）
 - [x] 质量门禁（lint/typecheck/test/coverage）
+- [x] CLI init 命令快速配置
 - [ ] 集成测试
 - [ ] 性能优化
-- [x] npm 发布（`@synth-coder/memhub@0.1.3`）
+- [x] npm 发布（`@synth-coder/memhub@0.2.3`）
 
 ---
 
