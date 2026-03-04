@@ -16,6 +16,7 @@ import { MemoryLoadInputSchema, MemoryUpdateInputV2Schema } from '../contracts/s
 import { TOOL_DEFINITIONS, SERVER_INFO } from '../contracts/mcp.js';
 import { ErrorCode } from '../contracts/types.js';
 import { SharedMemoryBackend, type MemoryBackend } from './shared-memory-backend.js';
+import type { RerankerMode } from '../services/retrieval/reranker.js';
 
 // Get package version
 const __filename = fileURLToPath(import.meta.url);
@@ -63,7 +64,14 @@ export function resolveStoragePath(): string {
 export function createMcpServer(): Server {
   const storagePath = resolveStoragePath();
   const vectorSearch = process.env.MEMHUB_VECTOR_SEARCH !== 'false';
-  const memoryBackend: MemoryBackend = new SharedMemoryBackend({ storagePath, vectorSearch });
+  const rerankerMode = (process.env.MEMHUB_RERANKER_MODE as RerankerMode | undefined) ?? 'auto';
+  const rerankerModelName = process.env.MEMHUB_RERANKER_MODEL;
+  const memoryBackend: MemoryBackend = new SharedMemoryBackend({
+    storagePath,
+    vectorSearch,
+    rerankerMode,
+    rerankerModelName,
+  });
 
   // Create server using SDK
   const server = new Server(

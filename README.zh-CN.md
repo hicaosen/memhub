@@ -158,6 +158,9 @@ args = ["-y", "@synth-coder/memhub@latest"]
 
 - `MEMHUB_STORAGE_PATH`：记忆存储目录（默认：`./memories`）
 - `MEMHUB_LOG_LEVEL`：日志级别（默认：`info`，可选：`debug|info|warn|error`）
+- `MEMHUB_VECTOR_SEARCH`：是否启用向量检索（默认：`true`，设为 `false` 可关闭）
+- `MEMHUB_RERANKER_MODE`：重排序模式（默认：`auto`，可选：`auto|model|lightweight`）
+- `MEMHUB_RERANKER_MODEL`：重排序模型 ID（默认：`BAAI/bge-reranker-v2-m3`）
 
 ---
 

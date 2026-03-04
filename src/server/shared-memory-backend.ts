@@ -9,6 +9,7 @@ import type {
   MemoryUpdateOutput,
 } from '../contracts/types.js';
 import { MemoryService } from '../services/memory-service.js';
+import type { RerankerMode } from '../services/retrieval/reranker.js';
 import { createLogger, type Logger } from '../utils/logger.js';
 
 const PROTOCOL_VERSION = 1;
@@ -45,6 +46,8 @@ type DaemonResponse = {
 export interface SharedMemoryBackendConfig {
   readonly storagePath: string;
   readonly vectorSearch?: boolean;
+  readonly rerankerMode?: RerankerMode;
+  readonly rerankerModelName?: string;
 }
 
 export interface MemoryBackend {
@@ -93,6 +96,8 @@ export class SharedMemoryBackend implements MemoryBackend {
     this.localService = new MemoryService({
       storagePath: config.storagePath,
       vectorSearch: config.vectorSearch,
+      rerankerMode: config.rerankerMode,
+      rerankerModelName: config.rerankerModelName,
     });
     this.logger = createLogger({ role: 'client' });
 

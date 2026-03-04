@@ -19,7 +19,9 @@
 - `src/services/retrieval/hybrid-scorer.ts`
   - Fused scoring (`vector + keyword + fact + importance + freshness + rerank`)
 - `src/services/retrieval/reranker.ts`
-  - Cross-encoder style re-rank abstraction with a lightweight default implementation
+  - Cross-encoder style re-rank abstraction:
+    - lightweight heuristic reranker
+    - model reranker (`BAAI/bge-reranker-v2-m3`) with auto fallback
 - `src/services/retrieval/pipeline.ts`
   - Orchestrates route -> rewrite -> recall -> fuse -> rerank
 
@@ -34,6 +36,16 @@
 4. Hybrid scorer computes final score per candidate.
 5. Reranker reorders top candidates.
 6. Return `SearchResult[]` to `MemoryService.search`.
+
+## Runtime Configuration
+
+- `MEMHUB_RERANKER_MODE`:
+  - `auto` (default): try model reranker, fallback to lightweight
+  - `model`: force model reranker
+  - `lightweight`: force heuristic reranker
+- `MEMHUB_RERANKER_MODEL`:
+  - Optional model id override
+  - Default: `BAAI/bge-reranker-v2-m3`
 
 ## Interfaces
 

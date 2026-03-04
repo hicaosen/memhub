@@ -191,6 +191,9 @@ This means "testing framework preference" finds memories about "Vitest vs Jest d
 
 - `MEMHUB_STORAGE_PATH` (default: `~/.memhub`)
 - `MEMHUB_LOG_LEVEL` (default: `info`, options: `debug|info|warn|error`)
+- `MEMHUB_VECTOR_SEARCH` (default: `true`, set `false` to disable vector retrieval)
+- `MEMHUB_RERANKER_MODE` (default: `auto`, options: `auto|model|lightweight`)
+- `MEMHUB_RERANKER_MODEL` (default: `BAAI/bge-reranker-v2-m3`)
 
 ---
 

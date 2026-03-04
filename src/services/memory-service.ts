@@ -28,6 +28,7 @@ import { RuleBasedFactExtractor } from './retrieval/fact-extractor.js';
 import { RetrievalPipeline } from './retrieval/pipeline.js';
 import type { FactExtractor, VectorRetriever } from './retrieval/types.js';
 import { VectorRetrieverAdapter } from './retrieval/vector-retriever.js';
+import { createReranker, type RerankerMode } from './retrieval/reranker.js';
 
 const LOCK_TIMEOUT = 5000; // 5 seconds
 
@@ -69,6 +70,17 @@ export interface MemoryServiceConfig {
    * @default true
    */
   vectorSearch?: boolean;
+  /**
+   * Reranker mode for retrieval pipeline.
+   * auto: try model and fallback to lightweight on failure.
+   * @default auto
+   */
+  rerankerMode?: RerankerMode;
+  /**
+   * Optional model name for model reranker.
+   * @default BAAI/bge-reranker-v2-m3
+   */
+  rerankerModelName?: string;
 }
 
 /**
@@ -165,6 +177,11 @@ export class MemoryService {
         return listed.memories;
       },
       vectorRetriever,
+    }, {
+      reranker: createReranker({
+        mode: config.rerankerMode ?? 'auto',
+        modelName: config.rerankerModelName,
+      }),
     });
   }
 

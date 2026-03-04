@@ -2,7 +2,7 @@ import type { Memory, SearchMemoryInput, SearchResult } from '../../contracts/ty
 import { scoreCandidate } from './hybrid-scorer.js';
 import { RuleBasedIntentRouter } from './intent-router.js';
 import { RuleBasedQueryRewriter } from './query-rewriter.js';
-import { LightweightCrossEncoderReranker } from './reranker.js';
+import { createReranker } from './reranker.js';
 import type {
   IntentRouter,
   QueryRewriter,
@@ -96,7 +96,7 @@ export class RetrievalPipeline {
   ) {
     this.intentRouter = deps?.intentRouter ?? new RuleBasedIntentRouter();
     this.queryRewriter = deps?.queryRewriter ?? new RuleBasedQueryRewriter();
-    this.reranker = deps?.reranker ?? new LightweightCrossEncoderReranker();
+    this.reranker = deps?.reranker ?? createReranker({ mode: 'auto' });
     this.now = context.now ?? (() => new Date());
   }
 

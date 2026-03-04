@@ -137,6 +137,9 @@ Since memories are plain text files, you can:
 | --------------------- | ----------- | ------------------------------------------- |
 | `MEMHUB_STORAGE_PATH` | `~/.memhub` | Memory storage directory                    |
 | `MEMHUB_LOG_LEVEL`    | `info`      | Log level: `debug`, `info`, `warn`, `error` |
+| `MEMHUB_VECTOR_SEARCH` | `true`     | Enable vector retrieval (`false` to disable) |
+| `MEMHUB_RERANKER_MODE` | `auto`     | Reranker mode: `auto`, `model`, `lightweight` |
+| `MEMHUB_RERANKER_MODEL` | `BAAI/bge-reranker-v2-m3` | Override reranker model id |
 
 ---
 
