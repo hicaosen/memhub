@@ -275,7 +275,7 @@ memhub/
 - [x] CLI init command for quick setup
 - [ ] Integration tests
 - [ ] Performance improvements
-- [x] npm release (`@synth-coder/memhub@0.2.5`)
+- [x] npm release (`@synth-coder/memhub@0.2.6`)
 
 ---
 

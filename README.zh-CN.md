@@ -244,7 +244,7 @@ memhub/
 - [x] CLI init 命令快速配置
 - [ ] 集成测试
 - [ ] 性能优化
-- [x] npm 发布（`@synth-coder/memhub@0.2.5`）
+- [x] npm 发布（`@synth-coder/memhub@0.2.6`）
 
 ---
 

@@ -1,6 +1,6 @@
 {
   "name": "@synth-coder/memhub",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "A Git-friendly memory hub using Markdown-based storage with YAML Front Matter",
   "type": "module",
   "main": "dist/src/index.js",
@@ -20,6 +20,7 @@
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"docs/**/*.md\"",
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "quality": "npm run lint && npm run typecheck && npm run test:coverage",
+    "prepack": "npm run build",
     "ci": "npm run quality"
   },
   "keywords": [
