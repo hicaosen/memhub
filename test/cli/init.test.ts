@@ -336,7 +336,6 @@ describe('CLI Init Command', () => {
       expect(config.mcpServers).toHaveProperty('memhub');
       expect(config.mcpServers.memhub.command).toBe('npx');
     });
-
   });
 
   describe('Instructions Update', () => {

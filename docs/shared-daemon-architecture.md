@@ -15,8 +15,10 @@ Allow multiple CLI sessions to start MemHub safely while sharing one database in
 1. Use `{storagePath}/.memhub-daemon.lock` as atomic election lock.
 2. First process creating lock with `flag=wx` becomes daemon.
 3. If lock exists, check lock PID liveness:
+
 - alive -> stay client
 - dead -> recover stale lock and retry election
+
 4. Daemon publishes endpoint metadata in `{storagePath}/.memhub-daemon.json`.
 
 ## IPC Protocol
@@ -24,22 +26,26 @@ Allow multiple CLI sessions to start MemHub safely while sharing one database in
 Transport: localhost TCP (JSON lines)
 
 Request:
+
 - `id: string`
 - `method: memory_load | memory_update`
 - `params: tool input`
 
 Response:
+
 - `id: string`
 - `ok: boolean`
 - `result?: tool output`
 - `error?: string`
 
 Compatibility guard:
+
 - `protocolVersion` in endpoint file must match client expectation.
 
 ## Failover
 
 When client request fails:
+
 1. Client clears cached endpoint.
 2. Client attempts election.
 3. Winner becomes new daemon and serves request locally.

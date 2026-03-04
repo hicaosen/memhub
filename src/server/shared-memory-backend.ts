@@ -2,7 +2,12 @@ import { createServer, Socket } from 'net';
 import { promises as fs } from 'fs';
 import { dirname, join } from 'path';
 import { randomUUID } from 'crypto';
-import type { MemoryLoadInput, MemoryLoadOutput, MemoryUpdateInput, MemoryUpdateOutput } from '../contracts/types.js';
+import type {
+  MemoryLoadInput,
+  MemoryLoadOutput,
+  MemoryUpdateInput,
+  MemoryUpdateOutput,
+} from '../contracts/types.js';
 import { MemoryService } from '../services/memory-service.js';
 
 const PROTOCOL_VERSION = 1;
@@ -190,7 +195,10 @@ export class SharedMemoryBackend implements MemoryBackend {
       await fs.writeFile(this.lockPath, lockPayload, { encoding: 'utf8', flag: 'wx' });
     } catch (error) {
       const alreadyExists =
-        !!error && typeof error === 'object' && 'code' in error && (error as { code?: string }).code === 'EEXIST';
+        !!error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        (error as { code?: string }).code === 'EEXIST';
 
       if (!alreadyExists) throw error;
 
