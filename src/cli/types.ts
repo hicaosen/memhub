@@ -8,7 +8,8 @@ export type AgentType =
   | 'cline'
   | 'windsurf'
   | 'factory-droid'
-  | 'gemini-cli';
+  | 'gemini-cli'
+  | 'codex';
 
 export interface AgentConfig {
   readonly id: AgentType;
@@ -18,7 +19,7 @@ export interface AgentConfig {
   readonly configFile: string;
   /** Global config file path (relative to home directory) */
   readonly globalConfigFile: string;
-  readonly configFormat: 'json' | 'markdown';
+  readonly configFormat: 'json' | 'markdown' | 'toml';
   /** Local instructions file path */
   readonly instructionsFile: string;
   /** Global instructions file path (relative to home directory) */
@@ -91,6 +92,17 @@ export const AGENTS: readonly AgentConfig[] = [
     configFormat: 'json',
     instructionsFile: 'GEMINI.md',
     globalInstructionsFile: '.gemini/GEMINI.md',
+    instructionsFormat: 'markdown',
+  },
+  {
+    id: 'codex',
+    name: 'Codex',
+    description: 'OpenAI CLI coding agent',
+    configFile: '.codex/config.toml',
+    globalConfigFile: '.codex/config.toml',
+    configFormat: 'toml',
+    instructionsFile: 'AGENTS.md',
+    globalInstructionsFile: '.codex/AGENTS.md',
     instructionsFormat: 'markdown',
   },
 ] as const;

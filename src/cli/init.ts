@@ -10,6 +10,7 @@ import * as p from '@clack/prompts';
 import { AGENTS, type AgentType, type AgentConfig, getAgentById } from './types.js';
 import { getConfigGenerator } from './agents/index.js';
 import { updateInstructionsContent } from './instructions.js';
+import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 
 export interface InitOptions {
   readonly agent: AgentType;
@@ -34,6 +35,32 @@ export interface InitError {
 }
 
 export type InitOutcome = InitResult | InitError;
+
+/**
+ * Parse config file content based on format
+ */
+function parseConfig(
+  content: string,
+  format: 'json' | 'markdown' | 'toml'
+): Record<string, unknown> {
+  if (format === 'toml') {
+    return parseToml(content) as Record<string, unknown>;
+  }
+  return JSON.parse(content) as Record<string, unknown>;
+}
+
+/**
+ * Stringify config to string based on format
+ */
+function stringifyConfig(
+  config: Record<string, unknown>,
+  format: 'json' | 'markdown' | 'toml'
+): string {
+  if (format === 'toml') {
+    return stringifyToml(config);
+  }
+  return JSON.stringify(config, null, 2);
+}
 
 /**
  * Merge memhub config into existing config
@@ -114,22 +141,23 @@ export function initAgent(options: InitOptions): InitOutcome {
   let finalConfig: Record<string, unknown>;
 
   // Check if config already exists
+  const configFormat = agentConfig.configFormat;
   if (existsSync(configPath)) {
     if (force) {
       // Force: still merge, but this updates memhub entry
       try {
         const existingContent = readFileSync(configPath, 'utf-8');
-        const existingConfig = JSON.parse(existingContent) as Record<string, unknown>;
+        const existingConfig = parseConfig(existingContent, configFormat);
         finalConfig = mergeMcpConfig(existingConfig, newConfig);
       } catch {
-        // Invalid JSON, use new config
+        // Invalid config, use new config
         finalConfig = newConfig;
       }
     } else {
       // No force: check if memhub already exists
       try {
         const existingContent = readFileSync(configPath, 'utf-8');
-        const existingConfig = JSON.parse(existingContent) as Record<string, unknown>;
+        const existingConfig = parseConfig(existingContent, configFormat);
         const servers = existingConfig.mcpServers as Record<string, unknown> | undefined;
 
         if (servers && 'memhub' in servers) {
@@ -161,7 +189,7 @@ export function initAgent(options: InitOptions): InitOutcome {
   }
 
   // Write MCP configuration
-  writeFileSync(configPath, JSON.stringify(finalConfig, null, 2), 'utf-8');
+  writeFileSync(configPath, stringifyConfig(finalConfig, configFormat), 'utf-8');
 
   // Handle instructions file
   let existingContent = '';

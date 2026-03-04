@@ -8,6 +8,7 @@ export { generateClineConfig } from './cline.js';
 export { generateWindsurfConfig } from './windsurf.js';
 export { generateFactoryDroidConfig } from './factory-droid.js';
 export { generateGeminiCliConfig } from './gemini-cli.js';
+export { generateCodexConfig } from './codex.js';
 
 import type { AgentType } from '../types.js';
 import { generateCursorConfig } from './cursor.js';
@@ -16,6 +17,7 @@ import { generateClineConfig } from './cline.js';
 import { generateWindsurfConfig } from './windsurf.js';
 import { generateFactoryDroidConfig } from './factory-droid.js';
 import { generateGeminiCliConfig } from './gemini-cli.js';
+import { generateCodexConfig } from './codex.js';
 
 export type ConfigGenerator = (memhubPath: string) => Record<string, unknown>;
 
@@ -26,6 +28,7 @@ const generators: Record<AgentType, ConfigGenerator> = {
   windsurf: generateWindsurfConfig,
   'factory-droid': generateFactoryDroidConfig,
   'gemini-cli': generateGeminiCliConfig,
+  codex: generateCodexConfig,
 };
 
 export function getConfigGenerator(agentId: AgentType): ConfigGenerator {

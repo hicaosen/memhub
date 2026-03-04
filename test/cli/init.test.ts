@@ -121,6 +121,23 @@ describe('CLI Init Command', () => {
       }
     });
 
+    it('should create local config and instructions for codex', () => {
+      const result = initAgent({
+        agent: 'codex',
+        local: true,
+        projectPath: TEST_DIR,
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.agent.id).toBe('codex');
+        expect(result.configPath).toBe('.codex/config.toml');
+        expect(result.instructionsPath).toBe('AGENTS.md');
+        expect(existsSync(join(TEST_DIR, '.codex/config.toml'))).toBe(true);
+        expect(existsSync(join(TEST_DIR, 'AGENTS.md'))).toBe(true);
+      }
+    });
+
     it('should fail for unknown agent', () => {
       const result = initAgent({
         agent: 'unknown-agent' as AgentType,
@@ -346,6 +363,7 @@ describe('Agent Types', () => {
     expect(agentIds).toContain('windsurf');
     expect(agentIds).toContain('factory-droid');
     expect(agentIds).toContain('gemini-cli');
+    expect(agentIds).toContain('codex');
   });
 
   it('should have valid config for each agent', () => {
@@ -353,7 +371,7 @@ describe('Agent Types', () => {
       expect(agent.configFile).toBeTruthy();
       expect(agent.globalConfigFile).toBeTruthy();
       expect(agent.name).toBeTruthy();
-      expect(agent.configFormat).toBe('json');
+      expect(agent.configFormat).toMatch(/^(json|markdown|toml)$/);
       expect(agent.instructionsFile).toBeTruthy();
       expect(agent.globalInstructionsFile).toBeTruthy();
       expect(agent.instructionsFormat).toMatch(/^(markdown|plain)$/);

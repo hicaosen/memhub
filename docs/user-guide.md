@@ -26,6 +26,7 @@ This will:
 | Windsurf | `~/.codeium/windsurf/mcp_config.json` | `.codeium/windsurf/mcp_config.json` |
 | Factory Droid | `~/.factory/mcp.json` | `.factory/mcp.json` |
 | Gemini CLI | `~/.gemini/settings.json` | `.gemini/settings.json` |
+| Codex | `~/.codex/config.toml` | `.codex/config.toml` |
 
 ### CLI Options
 

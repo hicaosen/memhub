@@ -77,6 +77,7 @@ npx -y @synth-coder/memhub init
 | Windsurf | `~/.codeium/windsurf/mcp_config.json` | `~/.windsurfrules` |
 | Factory Droid | `~/.factory/mcp.json` | `~/.factory/AGENTS.md` |
 | Gemini CLI | `~/.gemini/settings.json` | `~/.gemini/GEMINI.md` |
+| Codex | `~/.codex/config.toml` | `~/.codex/AGENTS.md` |
 
 ### CLI 选项
 
