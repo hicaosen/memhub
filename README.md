@@ -186,7 +186,7 @@ memhub/
 - [x] Quality gate (lint/typecheck/test/coverage)
 - [ ] Integration tests
 - [ ] Performance improvements
-- [x] npm release (`@synth-coder/memhub@0.1.3`)
+- [x] npm release (`@synth-coder/memhub@0.2.0`)
 
 ---
 

@@ -25,13 +25,10 @@
 ```ts
 interface MemoryLoadInput {
   id?: string;                 // 指定单条记忆 ID（优先级最高）
-  sessionId?: string;          // 会话 UUID（用于隔离并发 CLI）
-  date?: string;               // YYYY-MM-DD 日期过滤
   query?: string;              // 语义搜索查询（启用向量搜索）
   category?: string;           // 分类过滤
   tags?: string[];             // 标签过滤
   limit?: number;              // 返回数量限制，默认 20
-  scope?: 'stm' | 'all';       // 搜索范围，默认 stm
 }
 ```
 
@@ -74,7 +71,7 @@ interface MemoryLoadOutput {
 ### 输入
 
 ```ts
-type EntryType = 'decision' | 'preference' | 'knowledge' | 'todo' | 'state_change';
+type EntryType = 'preference' | 'decision' | 'context' | 'fact';
 
 interface MemoryUpdateInput {
   id?: string;                 // 有则更新；无则创建新记录

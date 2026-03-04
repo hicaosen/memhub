@@ -98,6 +98,45 @@ export const MemorySchema = z.object({
 - Edge cases go in `*-edge.test.ts` files
 - Run `pnpm run quality` before committing
 
+## Documentation Guidelines
+
+文档是代码契约的一部分，必须与实现保持同步。
+
+### 何时更新文档
+
+**必须更新文档的场景：**
+
+1. **接口变更** — 新增、修改、删除 MCP 工具参数或返回值
+2. **类型定义变更** — 修改 `src/contracts/types.ts` 中的类型
+3. **Schema 变更** — 修改 `src/contracts/schemas.ts` 中的 Zod schema
+4. **行为变更** — 工具的调用逻辑、错误处理、默认值发生变化
+5. **版本发布** — package.json 版本号变更时，同步更新 README 中的版本引用
+
+**文档与代码的对应关系：**
+
+| 代码文件 | 对应文档 |
+|---------|---------|
+| `src/contracts/types.ts` | `docs/contracts.md`、`docs/architecture.md` |
+| `src/contracts/schemas.ts` | `docs/contracts.md` |
+| `src/contracts/mcp.ts` | `docs/contracts.md`、`docs/tool-calling-policy.md` |
+| `package.json` (version) | `README.md` (Roadmap) |
+
+### 文档更新流程
+
+1. 修改代码后，检查相关文档是否需要同步
+2. 对照代码实现校对文档描述
+3. 移除文档中不存在于代码的参数/字段
+4. 补充文档中缺失的新增参数/字段
+5. 确保示例代码与实际类型定义一致
+
+### 验证方法
+
+```bash
+# 对比代码中的类型定义与文档描述
+grep -A 20 "interface MemoryLoadInput" src/contracts/types.ts
+grep -A 20 "MemoryLoadInput" docs/contracts.md
+```
+
 ## Git Workflow
 
 - Commit message format: `type: description` (feat/fix/docs/chore/refactor/test)
