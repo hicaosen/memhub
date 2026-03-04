@@ -10,28 +10,28 @@ MemHub is a Git-friendly memory MCP server for coding agents. It stores decision
 
 ```bash
 # Install dependencies
-pnpm install
+npx pnpm install
 
 # Build
-pnpm run build
+npx pnpm run build
 
 # Quality gate (lint + typecheck + test + coverage)
-pnpm run quality
+npx pnpm run quality
 ```
 
 ## Key Commands
 
 | Command | Description |
 |---------|-------------|
-| `pnpm run build` | Compile TypeScript |
-| `pnpm run lint` | ESLint check |
-| `pnpm run lint:fix` | Auto-fix lint issues |
-| `pnpm run typecheck` | TypeScript type check |
-| `pnpm run test` | Run Vitest tests |
-| `pnpm run test:watch` | Watch mode tests |
-| `pnpm run test:coverage` | Tests with coverage |
-| `pnpm run quality` | Full quality gate |
-| `pnpm vitest run -t "test name"` | Run specific test |
+| `npx pnpm run build` | Compile TypeScript |
+| `npx pnpm run lint` | ESLint check |
+| `npx pnpm run lint:fix` | Auto-fix lint issues |
+| `npx pnpm run typecheck` | TypeScript type check |
+| `npx pnpm run test` | Run Vitest tests |
+| `npx pnpm run test:watch` | Watch mode tests |
+| `npx pnpm run test:coverage` | Tests with coverage |
+| `npx pnpm run quality` | Full quality gate |
+| `npx pnpm vitest run -t "test name"` | Run specific test |
 
 ## Project Structure
 
@@ -96,7 +96,7 @@ export const MemorySchema = z.object({
 - Tests mirror `src/` structure in `test/` directory
 - Use Vitest: `describe`, `it`, `expect` pattern
 - Edge cases go in `*-edge.test.ts` files
-- Run `pnpm run quality` before committing
+- Run `npx pnpm run quality` before committing
 
 ## Documentation Guidelines
 
@@ -146,7 +146,7 @@ grep -A 20 "MemoryLoadInput" docs/contracts.md
 ## Dos and Don'ts
 
 ### Do
-- Run `pnpm run quality` before committing
+- Run `npx pnpm run quality` before committing
 - Add tests for new code
 - Use `import type` for type-only imports
 - Keep functions small and focused
