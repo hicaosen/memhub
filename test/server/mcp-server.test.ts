@@ -7,7 +7,12 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir, homedir } from 'os';
 import { join, resolve } from 'path';
-import { createMcpServer, resolveStoragePath } from '../../src/server/mcp-server.js';
+import {
+  buildStartupReport,
+  createMcpServer,
+  formatStartupBanner,
+  resolveStoragePath,
+} from '../../src/server/mcp-server.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
   TOOL_DEFINITIONS,
@@ -35,6 +40,9 @@ describe('McpServer (SDK)', () => {
     rmSync(tempDir, { recursive: true, force: true });
     delete process.env.MEMHUB_STORAGE_PATH;
     delete process.env.MEMHUB_VECTOR_SEARCH;
+    delete process.env.MEMHUB_RERANKER_MODE;
+    delete process.env.MEMHUB_RERANKER_MODEL;
+    delete process.env.MEMHUB_LOG_LEVEL;
   });
 
   describe('createMcpServer', () => {
@@ -206,6 +214,45 @@ describe('McpServer (SDK)', () => {
       const expected =
         process.platform === 'win32' ? 'C:\\myproject\\.memhub' : '/myproject/.memhub';
       expect(resolveStoragePath()).toBe(expected);
+    });
+  });
+
+  describe('startup logging', () => {
+    it('should build startup report with effective config', () => {
+      process.env.MEMHUB_RERANKER_MODE = 'model';
+      process.env.MEMHUB_RERANKER_MODEL = 'BAAI/bge-reranker-v2-m3';
+      process.env.MEMHUB_LOG_LEVEL = 'debug';
+
+      const report = buildStartupReport();
+      expect(report.serverName).toBe('memhub');
+      expect(report.storagePath).toBe(tempDir);
+      expect(report.vectorSearchEnabled).toBe(false);
+      expect(report.rerankerMode).toBe('model');
+      expect(report.logLevel).toBe('debug');
+      expect(report.tools).toContain('memory_load');
+      expect(report.tools).toContain('memory_update');
+    });
+
+    it('should format startup banner', () => {
+      const banner = formatStartupBanner({
+        serverName: 'memhub',
+        serverVersion: '0.0.1',
+        pid: 123,
+        nodeVersion: 'v22.0.0',
+        platform: 'win32/x64',
+        storagePath: 'C:\\memhub',
+        storageExists: true,
+        vectorSearchEnabled: true,
+        rerankerMode: 'auto',
+        rerankerModel: 'BAAI/bge-reranker-v2-m3',
+        logLevel: 'info',
+        protocolVersion: MCP_PROTOCOL_VERSION,
+        tools: ['memory_load', 'memory_update'],
+      });
+
+      expect(banner).toContain('[MemHub] Startup');
+      expect(banner).toContain('reranker=auto');
+      expect(banner).toContain('memory_load, memory_update');
     });
   });
 });

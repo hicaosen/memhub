@@ -13,7 +13,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { ServiceError } from '../services/memory-service.js';
 import { MemoryLoadInputSchema, MemoryUpdateInputV2Schema } from '../contracts/schemas.js';
-import { TOOL_DEFINITIONS, SERVER_INFO } from '../contracts/mcp.js';
+import { MCP_PROTOCOL_VERSION, TOOL_DEFINITIONS, SERVER_INFO } from '../contracts/mcp.js';
 import { ErrorCode } from '../contracts/types.js';
 import { SharedMemoryBackend, type MemoryBackend } from './shared-memory-backend.js';
 import type { RerankerMode } from '../services/retrieval/reranker.js';
@@ -25,6 +25,24 @@ interface PackageJson {
   version?: string;
 }
 
+type EffectiveRerankerMode = 'auto' | 'model' | 'lightweight';
+
+export interface StartupReport {
+  readonly serverName: string;
+  readonly serverVersion: string;
+  readonly pid: number;
+  readonly nodeVersion: string;
+  readonly platform: string;
+  readonly storagePath: string;
+  readonly storageExists: boolean;
+  readonly vectorSearchEnabled: boolean;
+  readonly rerankerMode: EffectiveRerankerMode;
+  readonly rerankerModel: string;
+  readonly logLevel: string;
+  readonly protocolVersion: string;
+  readonly tools: readonly string[];
+}
+
 // npm package runtime: dist/src/server -> package root
 // test runtime: src/server -> package root
 let packageJsonPath = join(__dirname, '../../../package.json');
@@ -34,6 +52,13 @@ if (!existsSync(packageJsonPath)) {
 }
 
 const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as PackageJson;
+
+function resolveRerankerMode(raw?: string): EffectiveRerankerMode {
+  if (raw === 'model' || raw === 'lightweight' || raw === 'auto') {
+    return raw;
+  }
+  return 'auto';
+}
 
 /**
  * Resolve storage path with the following priority:
@@ -64,7 +89,7 @@ export function resolveStoragePath(): string {
 export function createMcpServer(): Server {
   const storagePath = resolveStoragePath();
   const vectorSearch = process.env.MEMHUB_VECTOR_SEARCH !== 'false';
-  const rerankerMode = (process.env.MEMHUB_RERANKER_MODE as RerankerMode | undefined) ?? 'auto';
+  const rerankerMode = resolveRerankerMode(process.env.MEMHUB_RERANKER_MODE) as RerankerMode;
   const rerankerModelName = process.env.MEMHUB_RERANKER_MODEL;
   const memoryBackend: MemoryBackend = new SharedMemoryBackend({
     storagePath,
@@ -157,15 +182,55 @@ export function createMcpServer(): Server {
   return server;
 }
 
+export function buildStartupReport(): StartupReport {
+  const storagePath = resolveStoragePath();
+  const vectorSearchEnabled = process.env.MEMHUB_VECTOR_SEARCH !== 'false';
+  const rerankerMode = resolveRerankerMode(process.env.MEMHUB_RERANKER_MODE);
+  const rerankerModel = process.env.MEMHUB_RERANKER_MODEL ?? 'BAAI/bge-reranker-v2-m3';
+
+  return {
+    serverName: SERVER_INFO.name,
+    serverVersion: packageJson.version || SERVER_INFO.version,
+    pid: process.pid,
+    nodeVersion: process.version,
+    platform: `${process.platform}/${process.arch}`,
+    storagePath,
+    storageExists: existsSync(storagePath),
+    vectorSearchEnabled,
+    rerankerMode,
+    rerankerModel,
+    logLevel: process.env.MEMHUB_LOG_LEVEL ?? 'info',
+    protocolVersion: MCP_PROTOCOL_VERSION,
+    tools: TOOL_DEFINITIONS.map(tool => tool.name),
+  };
+}
+
+export function formatStartupBanner(report: StartupReport): string {
+  return [
+    '[MemHub] Startup',
+    `  server: ${report.serverName}@${report.serverVersion}`,
+    `  pid/node: ${report.pid} / ${report.nodeVersion}`,
+    `  platform: ${report.platform}`,
+    `  protocol: ${report.protocolVersion}`,
+    `  storage: ${report.storagePath} (exists=${report.storageExists})`,
+    `  retrieval: vector=${report.vectorSearchEnabled}, reranker=${report.rerankerMode}, model=${report.rerankerModel}`,
+    `  logLevel: ${report.logLevel}`,
+    `  tools: ${report.tools.join(', ')}`,
+  ].join('\n');
+}
+
 /**
  * Start the MCP server (only when run directly)
  */
 async function main(): Promise<void> {
+  const startupReport = buildStartupReport();
+  console.error(formatStartupBanner(startupReport));
+
   const server = createMcpServer();
   const transport = new StdioServerTransport();
 
   await server.connect(transport);
-  console.error('MemHub MCP Server running on stdio');
+  console.error('[MemHub] Ready: MCP Server running on stdio');
 }
 
 // Only run main() when this file is executed directly

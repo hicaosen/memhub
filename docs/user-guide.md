@@ -143,6 +143,21 @@ Since memories are plain text files, you can:
 
 ---
 
+## Startup Log
+
+On startup, MemHub prints a configuration snapshot to stderr, including:
+
+- Server name/version and protocol version
+- PID, Node version, platform
+- Resolved storage path and whether it exists
+- Retrieval switches (vector search, reranker mode, reranker model)
+- Active log level
+- Registered MCP tools
+
+Use this to quickly confirm runtime config before serving requests.
+
+---
+
 ## Tips
 
 ### What to Remember
