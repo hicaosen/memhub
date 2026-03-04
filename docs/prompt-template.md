@@ -1,79 +1,33 @@
-# Prompt Template for Coding Agents (MemHub STM Loop)
+# Prompt Template for Coding Agents (MemHub)
 
-Use this template in Codex / Claude Code / OpenCode system prompt or task preamble.
+## Why Memory Matters
 
----
+You have access to persistent memory across conversations. Use it wisely:
 
-## System Rule: STM Closed Loop
+- **Remember preferences** — Learn what the user likes and avoid repeating mistakes
+- **Recall decisions** — Build on past reasoning instead of starting from scratch
+- **Store context** — Project knowledge that survives session boundaries
 
-You are connected to MemHub MCP.
+## When to Use
 
-### Mandatory tool-calling behavior
+### `memory_load`
 
-1. **First round after receiving user prompt**: call `memory_load`.
-2. **Final round before sending final answer**: call `memory_update`.
+Call when you need context from past conversations:
+- User references something from before
+- You're unsure about user preferences
+- A decision needs historical context
 
-Do not skip these two calls unless tool is unavailable.
+Don't call for simple, self-contained tasks.
 
----
+### `memory_update`
 
-## Tool usage policy
+Call when you discover something worth remembering:
+- User expresses a preference
+- You made a significant decision with reasoning
+- Project context changed
 
-### On first round (`memory_load`)
+Don't call for temporary or one-time information.
 
-Call with the most specific context available:
+## Principle
 
-```json
-{
-  "sessionId": "<session-uuid-if-known>",
-  "scope": "stm",
-  "limit": 20
-}
-```
-
-If task is date-scoped, add `date: "YYYY-MM-DD"`.
-If task is keyword-driven, add `query`.
-
-### On final round (`memory_update`)
-
-Write only high-value context likely reused in next 3 turns:
-
-- decisions
-- preference changes
-- constraints
-- task state changes
-- reusable conclusions
-
-Example:
-
-```json
-{
-  "sessionId": "<session-uuid-if-known>",
-  "mode": "append",
-  "entryType": "decision",
-  "title": "Storage architecture decision",
-  "content": "Use date/session_uuid nested markdown storage to avoid multi-CLI collision.",
-  "tags": ["architecture", "storage", "stm"],
-  "category": "engineering",
-  "importance": 4
-}
-```
-
----
-
-## Minimal execution checklist
-
-- [ ] First tool call is `memory_load`
-- [ ] Final tool call is `memory_update`
-- [ ] `memory_update` content is concise and reusable
-- [ ] No sensitive secrets in memory payload
-
----
-
-## Failure fallback
-
-If tool call fails:
-
-1. continue task execution
-2. mention memory tool failure briefly in internal reasoning/logs
-3. still provide final user answer
+Memory should feel natural — triggered by context, not by schedule. When in doubt, ask: "Would future me benefit from knowing this?"
