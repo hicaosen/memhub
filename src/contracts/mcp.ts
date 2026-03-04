@@ -127,6 +127,11 @@ TIPS:
           description:
             'The information to remember. Be specific and include context. Example: "User prefers TypeScript with strict mode. Uses functional React components with hooks. Avoids class components."',
         },
+        idempotencyKey: {
+          type: 'string',
+          description:
+            'Optional client-generated idempotency key for safe retries. Reusing the same key with identical payload returns the original result.',
+        },
         title: {
           type: 'string',
           description:
@@ -195,6 +200,7 @@ export type ToolResult<T extends ToolName> = T extends 'memory_load'
         filePath: string;
         created: boolean;
         updated: boolean;
+        idempotentReplay?: boolean;
         memory: Memory;
       }
     : never;
@@ -212,6 +218,7 @@ export type ToolInput<T extends ToolName> = T extends 'memory_load'
     ? {
         id?: string;
         sessionId?: string;
+        idempotencyKey?: string;
         mode?: 'append' | 'upsert';
         entryType?: 'preference' | 'decision' | 'context' | 'fact';
         title?: string;

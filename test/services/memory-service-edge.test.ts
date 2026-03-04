@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { MemoryService, ServiceError } from '../../src/services/memory-service.js';
+import { MemoryService } from '../../src/services/memory-service.js';
 
 describe('MemoryService Edge Cases', () => {
   let tempDir: string;
@@ -299,6 +299,51 @@ describe('MemoryService Edge Cases', () => {
 
       const result = await memoryService.getTags();
       expect(result.tags).toEqual(['shared']);
+    });
+  });
+
+  describe('memory_update idempotency', () => {
+    it('replays result for same idempotencyKey and payload', async () => {
+      const input = {
+        sessionId: '550e8400-e29b-41d4-a716-446655440123',
+        idempotencyKey: 'idem-replay-1',
+        entryType: 'fact' as const,
+        title: 'Idempotent write',
+        content: 'should only be written once',
+        category: 'project',
+        tags: ['idempotent'],
+      };
+
+      const first = await memoryService.memoryUpdate(input);
+      const second = await memoryService.memoryUpdate(input);
+
+      expect(second.id).toBe(first.id);
+      expect(second.filePath).toBe(first.filePath);
+      expect(second.idempotentReplay).toBe(true);
+
+      const loaded = await memoryService.memoryLoad({ id: first.id });
+      expect(loaded.total).toBe(1);
+      expect(loaded.items[0]?.content).toBe('should only be written once');
+    });
+
+    it('rejects reused idempotencyKey with different payload', async () => {
+      await memoryService.memoryUpdate({
+        idempotencyKey: 'idem-conflict-1',
+        entryType: 'fact',
+        title: 'Original',
+        content: 'original content',
+      });
+
+      await expect(
+        memoryService.memoryUpdate({
+          idempotencyKey: 'idem-conflict-1',
+          entryType: 'fact',
+          title: 'Original',
+          content: 'changed content',
+        })
+      ).rejects.toMatchObject({
+        code: -32004,
+      });
     });
   });
 });

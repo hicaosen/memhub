@@ -14,6 +14,11 @@ import { createLogger, type Logger } from '../utils/logger.js';
 
 const PROTOCOL_VERSION = 1;
 const LOOPBACK_HOST = '127.0.0.1';
+const IPC_RETRY_DELAYS_MS = [50, 100, 200] as const;
+const LOAD_CONNECT_TIMEOUT_MS = 300;
+const LOAD_RESPONSE_TIMEOUT_MS = 8000;
+const UPDATE_CONNECT_TIMEOUT_MS = 300;
+const UPDATE_RESPONSE_TIMEOUT_MS = 30000;
 
 type BackendRole = 'daemon' | 'client';
 
@@ -41,6 +46,16 @@ type DaemonResponse = {
   readonly ok: boolean;
   readonly result?: MemoryLoadOutput | MemoryUpdateOutput;
   readonly error?: string;
+};
+
+type SendRequestOptions = {
+  readonly endpoint?: DaemonEndpoint;
+  readonly connectTimeoutMs: number;
+  readonly responseTimeoutMs: number;
+};
+
+type RetryRequestOptions = SendRequestOptions & {
+  readonly retryDelaysMs: readonly number[];
 };
 
 export interface SharedMemoryBackendConfig {
@@ -81,6 +96,24 @@ async function safeUnlink(path: string): Promise<void> {
   } catch {
     // Best-effort cleanup only.
   }
+}
+
+function isRetriableIpcError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const code = (error as NodeJS.ErrnoException).code;
+  if (code && ['ECONNREFUSED', 'ECONNRESET', 'EPIPE', 'ETIMEDOUT'].includes(code)) {
+    return true;
+  }
+
+  return (
+    error.message.includes('Daemon request timeout') ||
+    error.message.includes('Daemon connect timeout') ||
+    error.message.includes('socket hang up')
+  );
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, ms));
 }
 
 export class SharedMemoryBackend implements MemoryBackend {
@@ -148,11 +181,18 @@ export class SharedMemoryBackend implements MemoryBackend {
     }
 
     try {
-      const result = (await this.sendRequest({
-        id: randomUUID(),
-        method: 'memory_load',
-        params: input,
-      })) as MemoryLoadOutput;
+      const result = (await this.sendRequestWithRetry(
+        {
+          id: randomUUID(),
+          method: 'memory_load',
+          params: input,
+        },
+        {
+          connectTimeoutMs: LOAD_CONNECT_TIMEOUT_MS,
+          responseTimeoutMs: LOAD_RESPONSE_TIMEOUT_MS,
+          retryDelaysMs: IPC_RETRY_DELAYS_MS,
+        }
+      )) as MemoryLoadOutput;
       await this.logger.info('memory_load.success', 'memory_load served via daemon IPC', {
         requestId,
         durationMs: Date.now() - start,
@@ -173,11 +213,18 @@ export class SharedMemoryBackend implements MemoryBackend {
         });
         return result;
       }
-      const result = (await this.sendRequest({
-        id: randomUUID(),
-        method: 'memory_load',
-        params: input,
-      })) as MemoryLoadOutput;
+      const result = (await this.sendRequestWithRetry(
+        {
+          id: randomUUID(),
+          method: 'memory_load',
+          params: input,
+        },
+        {
+          connectTimeoutMs: LOAD_CONNECT_TIMEOUT_MS,
+          responseTimeoutMs: LOAD_RESPONSE_TIMEOUT_MS,
+          retryDelaysMs: IPC_RETRY_DELAYS_MS,
+        }
+      )) as MemoryLoadOutput;
       await this.logger.info(
         'memory_load.success',
         'memory_load served via daemon IPC after failover',
@@ -194,21 +241,26 @@ export class SharedMemoryBackend implements MemoryBackend {
   async memoryUpdate(input: MemoryUpdateInput): Promise<MemoryUpdateOutput> {
     await this.initialize();
     const requestId = randomUUID();
+    const inputWithIdempotencyKey: MemoryUpdateInput = {
+      ...input,
+      idempotencyKey: input.idempotencyKey ?? requestId,
+    };
     const start = Date.now();
     await this.logger.info('memory_update.start', 'memory_update request started', {
       requestId,
-      sessionId: input.sessionId,
+      sessionId: inputWithIdempotencyKey.sessionId,
       meta: {
-        hasId: !!input.id,
-        entryType: input.entryType,
-        category: input.category,
-        tagsCount: input.tags?.length ?? 0,
+        hasId: !!inputWithIdempotencyKey.id,
+        entryType: inputWithIdempotencyKey.entryType,
+        category: inputWithIdempotencyKey.category,
+        tagsCount: inputWithIdempotencyKey.tags?.length ?? 0,
+        hasIdempotencyKey: !!inputWithIdempotencyKey.idempotencyKey,
       },
     });
 
     if (this.role === 'daemon') {
       try {
-        const result = await this.localService.memoryUpdate(input);
+        const result = await this.localService.memoryUpdate(inputWithIdempotencyKey);
         await this.logger.info('memory_update.success', 'memory_update served locally by daemon', {
           requestId,
           sessionId: result.sessionId,
@@ -219,7 +271,7 @@ export class SharedMemoryBackend implements MemoryBackend {
       } catch (error) {
         await this.logger.error('memory_update.fail', 'memory_update failed on daemon', {
           requestId,
-          sessionId: input.sessionId,
+          sessionId: inputWithIdempotencyKey.sessionId,
           durationMs: Date.now() - start,
           meta: { error: error instanceof Error ? error.message : 'Unknown error' },
         });
@@ -228,11 +280,18 @@ export class SharedMemoryBackend implements MemoryBackend {
     }
 
     try {
-      const result = (await this.sendRequest({
-        id: randomUUID(),
-        method: 'memory_update',
-        params: input,
-      })) as MemoryUpdateOutput;
+      const result = (await this.sendRequestWithRetry(
+        {
+          id: randomUUID(),
+          method: 'memory_update',
+          params: inputWithIdempotencyKey,
+        },
+        {
+          connectTimeoutMs: UPDATE_CONNECT_TIMEOUT_MS,
+          responseTimeoutMs: UPDATE_RESPONSE_TIMEOUT_MS,
+          retryDelaysMs: IPC_RETRY_DELAYS_MS,
+        }
+      )) as MemoryUpdateOutput;
       await this.logger.info('memory_update.success', 'memory_update served via daemon IPC', {
         requestId,
         sessionId: result.sessionId,
@@ -250,7 +309,7 @@ export class SharedMemoryBackend implements MemoryBackend {
       );
       await this.recoverFromDaemonFailure();
       if (this.role !== 'client') {
-        const result = await this.localService.memoryUpdate(input);
+        const result = await this.localService.memoryUpdate(inputWithIdempotencyKey);
         await this.logger.info(
           'memory_update.success',
           'memory_update served after daemon failover',
@@ -263,11 +322,18 @@ export class SharedMemoryBackend implements MemoryBackend {
         );
         return result;
       }
-      const result = (await this.sendRequest({
-        id: randomUUID(),
-        method: 'memory_update',
-        params: input,
-      })) as MemoryUpdateOutput;
+      const result = (await this.sendRequestWithRetry(
+        {
+          id: randomUUID(),
+          method: 'memory_update',
+          params: inputWithIdempotencyKey,
+        },
+        {
+          connectTimeoutMs: UPDATE_CONNECT_TIMEOUT_MS,
+          responseTimeoutMs: UPDATE_RESPONSE_TIMEOUT_MS,
+          retryDelaysMs: IPC_RETRY_DELAYS_MS,
+        }
+      )) as MemoryUpdateOutput;
       await this.logger.info(
         'memory_update.success',
         'memory_update served via daemon IPC after failover',
@@ -505,29 +571,86 @@ export class SharedMemoryBackend implements MemoryBackend {
     }
   }
 
-  private async sendRequest(
-    request: DaemonRequest
+  private async sendRequestWithRetry(
+    request: DaemonRequest,
+    options: RetryRequestOptions
   ): Promise<MemoryLoadOutput | MemoryUpdateOutput> {
-    const endpoint = this.endpoint ?? (await this.waitForEndpoint());
+    const endpoint = options.endpoint ?? this.endpoint ?? (await this.waitForEndpoint());
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt <= options.retryDelaysMs.length; attempt += 1) {
+      try {
+        return await this.sendRequest(request, {
+          endpoint,
+          connectTimeoutMs: options.connectTimeoutMs,
+          responseTimeoutMs: options.responseTimeoutMs,
+        });
+      } catch (error) {
+        lastError = error;
+        if (!isRetriableIpcError(error) || attempt === options.retryDelaysMs.length) {
+          throw error;
+        }
+        await this.logger.warn('ipc.request.retry', 'Retrying daemon request on same endpoint', {
+          requestId: request.id,
+          meta: {
+            method: request.method,
+            attempt: attempt + 1,
+            delayMs: options.retryDelaysMs[attempt],
+            endpoint,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          },
+        });
+        await sleep(options.retryDelaysMs[attempt] ?? 0);
+      }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error('Unknown daemon request error');
+  }
+
+  private async sendRequest(
+    request: DaemonRequest,
+    options: SendRequestOptions
+  ): Promise<MemoryLoadOutput | MemoryUpdateOutput> {
+    const endpoint = options.endpoint ?? this.endpoint ?? (await this.waitForEndpoint());
 
     return new Promise((resolve, reject) => {
       const socket = new Socket();
       let buffer = '';
+      let settled = false;
+      let connectTimeout: NodeJS.Timeout | undefined;
+      let responseTimeout: NodeJS.Timeout | undefined;
 
-      const timeout = setTimeout(() => {
+      const settleError = (error: Error): void => {
+        if (settled) return;
+        settled = true;
+        if (connectTimeout) clearTimeout(connectTimeout);
+        if (responseTimeout) clearTimeout(responseTimeout);
+        reject(error);
+      };
+
+      const settleSuccess = (result: MemoryLoadOutput | MemoryUpdateOutput): void => {
+        if (settled) return;
+        settled = true;
+        if (connectTimeout) clearTimeout(connectTimeout);
+        if (responseTimeout) clearTimeout(responseTimeout);
+        resolve(result);
+      };
+
+      connectTimeout = setTimeout(() => {
+        const error = new Error('Daemon connect timeout');
+        (error as NodeJS.ErrnoException).code = 'ETIMEDOUT';
         socket.destroy();
-        reject(new Error('Daemon request timeout'));
-      }, 5000);
+        settleError(error);
+      }, options.connectTimeoutMs);
 
       socket.setEncoding('utf8');
 
       socket.on('error', error => {
-        clearTimeout(timeout);
         void this.logger.error('ipc.request.fail', 'Daemon request socket error', {
           requestId: request.id,
           meta: { error: error.message },
         });
-        reject(error);
+        settleError(error);
       });
 
       socket.on('data', (chunk: string) => {
@@ -536,11 +659,10 @@ export class SharedMemoryBackend implements MemoryBackend {
         if (newlineIndex === -1) return;
 
         const line = buffer.slice(0, newlineIndex).trim();
-        clearTimeout(timeout);
         socket.end();
 
         if (!line) {
-          reject(new Error('Daemon returned empty response'));
+          settleError(new Error('Daemon returned empty response'));
           return;
         }
 
@@ -548,24 +670,31 @@ export class SharedMemoryBackend implements MemoryBackend {
         try {
           response = parseJson<DaemonResponse>(line);
         } catch {
-          reject(new Error('Daemon returned invalid JSON response'));
+          settleError(new Error('Daemon returned invalid JSON response'));
           return;
         }
 
         if (!response.ok) {
-          reject(new Error(response.error ?? 'Daemon request failed'));
+          settleError(new Error(response.error ?? 'Daemon request failed'));
           return;
         }
 
         if (!response.result) {
-          reject(new Error('Daemon response missing result'));
+          settleError(new Error('Daemon response missing result'));
           return;
         }
 
-        resolve(response.result);
+        settleSuccess(response.result);
       });
 
       socket.connect(endpoint.port, endpoint.host, () => {
+        if (connectTimeout) clearTimeout(connectTimeout);
+        responseTimeout = setTimeout(() => {
+          const error = new Error('Daemon request timeout');
+          (error as NodeJS.ErrnoException).code = 'ETIMEDOUT';
+          socket.destroy();
+          settleError(error);
+        }, options.responseTimeoutMs);
         void this.logger.info('ipc.request', 'Sending daemon request', {
           requestId: request.id,
           meta: { method: request.method, endpoint },

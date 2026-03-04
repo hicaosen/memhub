@@ -66,6 +66,7 @@ Store new memories or update existing ones.
 | ------------ | -------- | -------- | ------------------------------------------ |
 | `title`      | string   | Yes      | Short, descriptive title                   |
 | `content`    | string   | Yes      | Detailed memory content                    |
+| `idempotencyKey` | string | No | Client-generated retry key to avoid duplicate writes |
 | `tags`       | string[] | No       | Tags for categorization                    |
 | `entryType`  | string   | No       | Memory type (default: `fact`)              |
 | `category`   | string   | No       | Category (e.g., `engineering`, `business`) |
@@ -86,8 +87,15 @@ Store new memories or update existing ones.
 ```json
 {
   "id": "uuid",
-  "title": "Memory title",
-  "createdAt": "2026-03-04T10:00:00.000Z"
+  "sessionId": "uuid",
+  "filePath": "/abs/path/to/memory.md",
+  "created": true,
+  "updated": false,
+  "idempotentReplay": false,
+  "memory": {
+    "title": "Memory title",
+    "content": "Memory content..."
+  }
 }
 ```
 

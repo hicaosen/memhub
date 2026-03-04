@@ -1,4 +1,7 @@
 import { randomUUID } from 'crypto';
+import { createHash } from 'crypto';
+import { readFile, writeFile, mkdir, rename } from 'fs/promises';
+import { dirname, join } from 'path';
 import type {
   Memory,
   CreateMemoryInput,
@@ -109,6 +112,12 @@ export interface MemoryServiceConfig {
   llmAssistantThreads?: number;
 }
 
+interface MemoryUpdateIdempotencyRecord {
+  readonly fingerprint: string;
+  readonly recordedAt: string;
+  readonly result: MemoryUpdateOutput;
+}
+
 /**
  * Memory service implementation
  */
@@ -120,9 +129,15 @@ export class MemoryService {
   private readonly vectorSearchEnabled: boolean;
   private readonly factExtractor: FactExtractor;
   private readonly retrievalPipeline: RetrievalPipeline;
+  private readonly idempotencyFilePath: string;
 
   constructor(config: MemoryServiceConfig) {
     this.storagePath = config.storagePath;
+    this.idempotencyFilePath = join(
+      config.storagePath,
+      '.memhub-idempotency',
+      'memory-update-index.json'
+    );
     this.storage = new MarkdownStorage({ storagePath: config.storagePath });
     this.vectorSearchEnabled = config.vectorSearch !== false;
 
@@ -654,6 +669,20 @@ export class MemoryService {
     try {
       const now = new Date().toISOString();
       const sessionId = input.sessionId ?? randomUUID();
+      const idempotencyKey = input.idempotencyKey;
+      const fingerprint = idempotencyKey ? this.computeMemoryUpdateFingerprint(input) : null;
+
+      if (idempotencyKey && fingerprint) {
+        const replay = await this.findIdempotentReplay(idempotencyKey, fingerprint);
+        if (replay) {
+          return {
+            ...replay,
+            idempotentReplay: true,
+          };
+        }
+      }
+
+      let result: MemoryUpdateOutput;
 
       if (input.id) {
         // Inline update logic to avoid nested lock
@@ -689,7 +718,7 @@ export class MemoryService {
         const filePath = await this.storage.write(updatedMemory);
         this.scheduleVectorUpsert(updatedMemory);
 
-        return {
+        result = {
           id: updatedMemory.id,
           sessionId,
           filePath,
@@ -697,40 +726,123 @@ export class MemoryService {
           updated: true,
           memory: updatedMemory,
         };
-      }
-
-      const id = randomUUID();
-      const createdMemory: Memory = {
-        id,
-        createdAt: now,
-        updatedAt: now,
-        sessionId,
-        entryType: input.entryType,
-        facts: await this.factExtractor.extract({
+      } else {
+        const id = randomUUID();
+        const createdMemory: Memory = {
+          id,
+          createdAt: now,
+          updatedAt: now,
+          sessionId,
+          entryType: input.entryType,
+          facts: await this.factExtractor.extract({
+            title: input.title ?? 'memory note',
+            content: input.content,
+          }),
+          tags: input.tags ?? [],
+          category: input.category ?? 'general',
+          importance: input.importance ?? 3,
           title: input.title ?? 'memory note',
           content: input.content,
-        }),
-        tags: input.tags ?? [],
-        category: input.category ?? 'general',
-        importance: input.importance ?? 3,
-        title: input.title ?? 'memory note',
-        content: input.content,
-      };
+        };
 
-      const filePath = await this.storage.write(createdMemory);
-      this.scheduleVectorUpsert(createdMemory);
+        const filePath = await this.storage.write(createdMemory);
+        this.scheduleVectorUpsert(createdMemory);
 
-      return {
-        id,
-        sessionId,
-        filePath,
-        created: true,
-        updated: false,
-        memory: createdMemory,
-      };
+        result = {
+          id,
+          sessionId,
+          filePath,
+          created: true,
+          updated: false,
+          memory: createdMemory,
+        };
+      }
+
+      if (idempotencyKey && fingerprint) {
+        await this.persistIdempotencyRecord(idempotencyKey, fingerprint, result);
+      }
+
+      return result;
     } finally {
       await release();
     }
+  }
+
+  private computeMemoryUpdateFingerprint(input: MemoryUpdateInput): string {
+    const canonical = {
+      id: input.id ?? null,
+      sessionId: input.sessionId ?? null,
+      mode: input.mode ?? 'append',
+      entryType: input.entryType ?? null,
+      title: input.title ?? null,
+      content: input.content,
+      tags: input.tags ?? [],
+      category: input.category ?? null,
+      importance: input.importance ?? null,
+    };
+
+    return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+  }
+
+  private async findIdempotentReplay(
+    key: string,
+    fingerprint: string
+  ): Promise<MemoryUpdateOutput | null> {
+    const index = await this.loadIdempotencyIndex();
+    const record = index[key];
+    if (!record) return null;
+
+    if (record.fingerprint !== fingerprint) {
+      throw new ServiceError(
+        `Idempotency key conflict: ${key}`,
+        ErrorCode.DUPLICATE_ERROR,
+        { idempotencyKey: key }
+      );
+    }
+
+    return record.result;
+  }
+
+  private async persistIdempotencyRecord(
+    key: string,
+    fingerprint: string,
+    result: MemoryUpdateOutput
+  ): Promise<void> {
+    const index = await this.loadIdempotencyIndex();
+    index[key] = {
+      fingerprint,
+      recordedAt: new Date().toISOString(),
+      result,
+    };
+    await this.saveIdempotencyIndex(index);
+  }
+
+  private async loadIdempotencyIndex(): Promise<Record<string, MemoryUpdateIdempotencyRecord>> {
+    try {
+      const raw = await readFile(this.idempotencyFilePath, 'utf-8');
+      return JSON.parse(raw) as Record<string, MemoryUpdateIdempotencyRecord>;
+    } catch (error) {
+      const errorCode =
+        error && typeof error === 'object' && 'code' in error
+          ? (error as { code?: string }).code
+          : undefined;
+      if (errorCode === 'ENOENT') {
+        return {};
+      }
+      throw new ServiceError(
+        `Failed to load idempotency index: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        ErrorCode.STORAGE_ERROR
+      );
+    }
+  }
+
+  private async saveIdempotencyIndex(
+    index: Record<string, MemoryUpdateIdempotencyRecord>
+  ): Promise<void> {
+    await mkdir(dirname(this.idempotencyFilePath), { recursive: true });
+    const tempPath = `${this.idempotencyFilePath}.${process.pid}.${Date.now()}.tmp`;
+    await writeFile(tempPath, JSON.stringify(index), 'utf-8');
+    await rename(tempPath, this.idempotencyFilePath);
   }
 
   // ---------------------------------------------------------------------------

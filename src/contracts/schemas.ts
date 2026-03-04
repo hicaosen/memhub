@@ -227,6 +227,12 @@ export const MemoryLoadInputSchema = z.object({
 export const MemoryUpdateInputV2Schema = z.object({
   id: UUIDSchema.optional(),
   sessionId: UUIDSchema.optional(),
+  idempotencyKey: z
+    .string()
+    .min(1)
+    .max(128)
+    .regex(/^[A-Za-z0-9:_-]+$/, 'idempotencyKey can only contain letters, numbers, :, _, -')
+    .optional(),
   mode: z.enum(['append', 'upsert']).default('append'),
   entryType: MemoryEntryTypeSchema.optional(),
   title: z.string().min(1).max(200).optional(),
@@ -262,6 +268,7 @@ export const MemoryUpdateOutputSchema = z.object({
   filePath: z.string().min(1),
   created: z.boolean(),
   updated: z.boolean(),
+  idempotentReplay: z.boolean().optional(),
   memory: MemorySchema,
 });
 

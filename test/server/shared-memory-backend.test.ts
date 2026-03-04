@@ -78,4 +78,55 @@ describe('SharedMemoryBackend', () => {
 
     await second.close();
   });
+
+  it('retries IPC on same endpoint before failover', async () => {
+    const daemonOwner = new SharedMemoryBackend({ storagePath: tempDir, vectorSearch: false });
+    const client = new SharedMemoryBackend({ storagePath: tempDir, vectorSearch: false });
+
+    await daemonOwner.initialize();
+    await client.initialize();
+
+    const created = await daemonOwner.memoryUpdate({
+      sessionId: SESSION_ID,
+      entryType: 'fact',
+      title: 'Retry target',
+      content: 'hello retry',
+      category: 'project',
+      tags: ['retry'],
+    });
+
+    const backend = client as unknown as {
+      sendRequest: (...args: unknown[]) => Promise<unknown>;
+      recoverFromDaemonFailure: () => Promise<void>;
+    };
+
+    const originalSendRequest = backend.sendRequest.bind(client);
+    const originalRecover = backend.recoverFromDaemonFailure.bind(client);
+
+    let sendAttempts = 0;
+    let failoverAttempts = 0;
+
+    backend.sendRequest = async (...args: unknown[]): Promise<unknown> => {
+      sendAttempts += 1;
+      if (sendAttempts <= 2) {
+        const error = new Error('connect ECONNREFUSED 127.0.0.1:12345') as NodeJS.ErrnoException;
+        error.code = 'ECONNREFUSED';
+        throw error;
+      }
+      return originalSendRequest(...args);
+    };
+
+    backend.recoverFromDaemonFailure = async (): Promise<void> => {
+      failoverAttempts += 1;
+      await originalRecover();
+    };
+
+    const loaded = await client.memoryLoad({ id: created.id });
+    expect(loaded.total).toBe(1);
+    expect(sendAttempts).toBe(3);
+    expect(failoverAttempts).toBe(0);
+
+    await daemonOwner.close();
+    await client.close();
+  });
 });

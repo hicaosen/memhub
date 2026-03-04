@@ -276,6 +276,7 @@ export interface MemoryLoadInput extends Partial<MemoryFilter> {
 export interface MemoryUpdateInput {
   readonly id?: UUID;
   readonly sessionId?: UUID;
+  readonly idempotencyKey?: string;
   readonly mode?: 'append' | 'upsert';
   readonly entryType?: MemoryEntryType;
   readonly title?: string;
@@ -317,6 +318,7 @@ export interface MemoryUpdateOutput {
   readonly filePath: string;
   readonly created: boolean;
   readonly updated: boolean;
+  readonly idempotentReplay?: boolean;
   readonly memory: Memory;
 }
 
