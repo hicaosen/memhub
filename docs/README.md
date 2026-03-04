@@ -4,10 +4,10 @@ Welcome to MemHub documentation. MemHub is a Git-friendly memory system for AI c
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [User Guide](user-guide.md) | Complete guide for using MemHub |
-| [MCP Tools](mcp-tools.md) | API reference for memory_load and memory_update |
+| Document                    | Description                                     |
+| --------------------------- | ----------------------------------------------- |
+| [User Guide](user-guide.md) | Complete guide for using MemHub                 |
+| [MCP Tools](mcp-tools.md)   | API reference for memory_load and memory_update |
 
 ## Quick Links
 

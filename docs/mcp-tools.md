@@ -10,12 +10,12 @@ Load relevant memories to get context for the current task.
 
 ### Parameters
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `query` | string | No | Search query to filter memories |
-| `tags` | string[] | No | Filter by tags |
-| `limit` | number | No | Max memories to return (default: 10) |
-| `entryType` | string | No | Filter by type: `preference`, `decision`, `context`, `fact` |
+| Parameter   | Type     | Required | Description                                                 |
+| ----------- | -------- | -------- | ----------------------------------------------------------- |
+| `query`     | string   | No       | Search query to filter memories                             |
+| `tags`      | string[] | No       | Filter by tags                                              |
+| `limit`     | number   | No       | Max memories to return (default: 10)                        |
+| `entryType` | string   | No       | Filter by type: `preference`, `decision`, `context`, `fact` |
 
 ### Returns
 
@@ -62,24 +62,24 @@ Store new memories or update existing ones.
 
 ### Parameters
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `title` | string | Yes | Short, descriptive title |
-| `content` | string | Yes | Detailed memory content |
-| `tags` | string[] | No | Tags for categorization |
-| `entryType` | string | No | Memory type (default: `fact`) |
-| `category` | string | No | Category (e.g., `engineering`, `business`) |
-| `importance` | number | No | Importance 1-5 (default: 3) |
-| `id` | string | No | Existing memory ID to update |
+| Parameter    | Type     | Required | Description                                |
+| ------------ | -------- | -------- | ------------------------------------------ |
+| `title`      | string   | Yes      | Short, descriptive title                   |
+| `content`    | string   | Yes      | Detailed memory content                    |
+| `tags`       | string[] | No       | Tags for categorization                    |
+| `entryType`  | string   | No       | Memory type (default: `fact`)              |
+| `category`   | string   | No       | Category (e.g., `engineering`, `business`) |
+| `importance` | number   | No       | Importance 1-5 (default: 3)                |
+| `id`         | string   | No       | Existing memory ID to update               |
 
 ### Entry Types
 
-| Type | Purpose |
-|------|---------|
+| Type         | Purpose                                            |
+| ------------ | -------------------------------------------------- |
 | `preference` | User preferences (coding style, framework choices) |
-| `decision` | Architecture decisions, technology choices |
-| `context` | Project context (team, processes, constraints) |
-| `fact` | Learned facts, important notes |
+| `decision`   | Architecture decisions, technology choices         |
+| `context`    | Project context (team, processes, constraints)     |
+| `fact`       | Learned facts, important notes                     |
 
 ### Returns
 
@@ -117,12 +117,14 @@ Store new memories or update existing ones.
 ### What to Store
 
 **Good candidates:**
+
 - User preferences (coding style, frameworks)
 - Technical decisions and their reasoning
 - Project constraints and conventions
 - Lessons learned from mistakes
 
 **Avoid storing:**
+
 - Temporary information
 - One-time tasks
 - Sensitive data (API keys, passwords)
