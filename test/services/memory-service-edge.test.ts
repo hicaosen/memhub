@@ -217,6 +217,60 @@ describe('MemoryService Edge Cases', () => {
       });
       expect(result.results.length).toBeGreaterThan(0);
     });
+
+    it('should recall off-time memory using query rewrite and facts', async () => {
+      await memoryService.create({
+        title: 'User work schedule',
+        content: '用户一般每天加班到21:00，工作时间较长。',
+        tags: ['schedule'],
+      });
+
+      const result = await memoryService.search({ query: '我每天几点下班' });
+      expect(result.results.length).toBeGreaterThan(0);
+      expect(result.results[0].memory.title).toBe('User work schedule');
+    });
+
+    it('should fallback to keyword search when retrieval pipeline returns empty', async () => {
+      await memoryService.create({
+        title: 'Project Planning',
+        content: 'plan timeline and resources',
+        tags: ['planning'],
+      });
+
+      (
+        memoryService as unknown as {
+          retrievalPipeline: { search: (input: { query: string }) => Promise<{ results: []; total: 0 }> };
+        }
+      ).retrievalPipeline = {
+        search: async () => ({ results: [], total: 0 }),
+      };
+
+      const result = await memoryService.search({ query: 'planning' });
+      expect(result.results.length).toBeGreaterThan(0);
+      expect(result.results[0].memory.title).toBe('Project Planning');
+    });
+
+    it('should fallback to keyword search when retrieval pipeline throws', async () => {
+      await memoryService.create({
+        title: 'Meeting Notes',
+        content: 'Discussed project requirements.',
+        tags: ['meeting'],
+      });
+
+      (
+        memoryService as unknown as {
+          retrievalPipeline: { search: (input: { query: string }) => Promise<never> };
+        }
+      ).retrievalPipeline = {
+        search: async () => {
+          throw new Error('pipeline failed');
+        },
+      };
+
+      const result = await memoryService.search({ query: 'meeting' });
+      expect(result.results.length).toBeGreaterThan(0);
+      expect(result.results[0].memory.title).toBe('Meeting Notes');
+    });
   });
 
   describe('getCategories and getTags edge cases', () => {

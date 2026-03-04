@@ -30,6 +30,21 @@ export type MemoryEntryType =
   | 'context' // Project/environment information
   | 'fact'; // Objective knowledge
 
+/**
+ * Structured fact extracted from free-form memory text.
+ * Keeps memory transparent while enabling precise retrieval.
+ */
+export interface MemoryFact {
+  /** Namespaced fact key. Example: work_schedule.off_time */
+  readonly key: string;
+  /** Normalized fact value. Example: 21:00 */
+  readonly value: string;
+  /** Confidence score from 0 to 1 */
+  readonly confidence: number;
+  /** Extraction source */
+  readonly source: 'rule' | 'llm' | 'manual';
+}
+
 export interface Memory {
   /** UUID v4 unique identifier */
   readonly id: UUID;
@@ -43,6 +58,8 @@ export interface Memory {
   sessionId?: UUID;
   /** Memory entry type */
   entryType?: MemoryEntryType;
+  /** Structured facts extracted from content */
+  facts?: readonly MemoryFact[];
   /** Tags for categorization and search */
   tags: readonly string[];
   /** Category for organization */
@@ -67,6 +84,7 @@ export interface MemoryFrontMatter {
   updated_at: ISO8601Timestamp;
   session_id?: UUID;
   entry_type?: MemoryEntryType;
+  facts?: readonly MemoryFact[];
   tags: readonly string[];
   category: string;
   importance: number;

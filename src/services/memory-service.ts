@@ -24,6 +24,10 @@ import type {
 import { ErrorCode } from '../contracts/types.js';
 import { MarkdownStorage, StorageError } from '../storage/markdown-storage.js';
 import lockfile from 'proper-lockfile';
+import { RuleBasedFactExtractor } from './retrieval/fact-extractor.js';
+import { RetrievalPipeline } from './retrieval/pipeline.js';
+import type { FactExtractor, VectorRetriever } from './retrieval/types.js';
+import { VectorRetrieverAdapter } from './retrieval/vector-retriever.js';
 
 const LOCK_TIMEOUT = 5000; // 5 seconds
 
@@ -76,6 +80,8 @@ export class MemoryService {
   private readonly vectorIndex: IVectorIndex | null;
   private readonly embedding: IEmbeddingService | null;
   private readonly vectorSearchEnabled: boolean;
+  private readonly factExtractor: FactExtractor;
+  private readonly retrievalPipeline: RetrievalPipeline;
 
   constructor(config: MemoryServiceConfig) {
     this.storagePath = config.storagePath;
@@ -130,6 +136,36 @@ export class MemoryService {
       this.vectorIndex = null;
       this.embedding = null;
     }
+
+    this.factExtractor = new RuleBasedFactExtractor();
+
+    const vectorRetriever: VectorRetriever | undefined =
+      this.vectorSearchEnabled && this.vectorIndex && this.embedding
+        ? new VectorRetrieverAdapter({
+            embedding: this.embedding,
+            vectorIndex: this.vectorIndex,
+            readMemoryById: async id => {
+              try {
+                const { memory } = await this.read({ id });
+                return memory;
+              } catch {
+                return null;
+              }
+            },
+          })
+        : undefined;
+
+    this.retrievalPipeline = new RetrievalPipeline({
+      listMemories: async input => {
+        const listed = await this.list({
+          category: input.category,
+          tags: input.tags,
+          limit: 1000,
+        });
+        return listed.memories;
+      },
+      vectorRetriever,
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -188,6 +224,10 @@ export class MemoryService {
         id,
         createdAt: now,
         updatedAt: now,
+        facts: this.factExtractor.extract({
+          title: input.title,
+          content: input.content,
+        }),
         tags: input.tags ?? [],
         category: input.category ?? 'general',
         importance: input.importance ?? 3,
@@ -258,6 +298,10 @@ export class MemoryService {
         ...(input.category !== undefined && { category: input.category }),
         ...(input.importance !== undefined && { importance: input.importance }),
       };
+      updated.facts = this.factExtractor.extract({
+        title: updated.title,
+        content: updated.content,
+      });
 
       try {
         await this.storage.write(updated);
@@ -377,44 +421,16 @@ export class MemoryService {
    * Uses vector semantic search when available, falls back to keyword search.
    */
   async search(input: SearchMemoryInput): Promise<{ results: SearchResult[]; total: number }> {
-    // --- Vector semantic search path ---
-    if (this.vectorSearchEnabled && this.vectorIndex && this.embedding) {
-      try {
-        const queryVec = await this.embedding.embed(input.query);
-        const vectorResults = await this.vectorIndex.search(queryVec, input.limit ?? 10);
-
-        const results: SearchResult[] = [];
-        for (const vr of vectorResults) {
-          try {
-            const { memory } = await this.read({ id: vr.id });
-
-            // Apply metadata filters
-            if (input.category && memory.category !== input.category) continue;
-            if (
-              input.tags &&
-              input.tags.length > 0 &&
-              !input.tags.every(t => memory.tags.includes(t))
-            ) {
-              continue;
-            }
-
-            // Convert cosine distance (0‥2) → similarity score (0‥1)
-            const score = Math.max(0, 1 - vr._distance / 2);
-            results.push({ memory, score, matches: [memory.title] });
-          } catch {
-            // Memory in index but missing on disk — skip
-          }
-        }
-
-        return { results, total: results.length };
-      } catch (err) {
-        // Fall through to keyword search on vector failure
-        console.error('[MemHub] Vector search failed, falling back to keyword search:', err);
+    try {
+      const result = await this.retrievalPipeline.search(input);
+      if (result.results.length > 0) {
+        return result;
       }
+      return this.keywordSearch(input);
+    } catch (error) {
+      console.error('[MemHub] Retrieval pipeline failed, falling back to keyword search:', error);
+      return this.keywordSearch(input);
     }
-
-    // --- Keyword search fallback ---
-    return this.keywordSearch(input);
   }
 
   /**
@@ -564,6 +580,10 @@ export class MemoryService {
           ...(input.category !== undefined && { category: input.category }),
           ...(input.importance !== undefined && { importance: input.importance }),
         };
+        updatedMemory.facts = this.factExtractor.extract({
+          title: updatedMemory.title,
+          content: updatedMemory.content,
+        });
 
         const filePath = await this.storage.write(updatedMemory);
         this.scheduleVectorUpsert(updatedMemory);
@@ -585,6 +605,10 @@ export class MemoryService {
         updatedAt: now,
         sessionId,
         entryType: input.entryType,
+        facts: this.factExtractor.extract({
+          title: input.title ?? 'memory note',
+          content: input.content,
+        }),
         tags: input.tags ?? [],
         category: input.category ?? 'general',
         importance: input.importance ?? 3,

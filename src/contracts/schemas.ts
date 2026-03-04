@@ -47,6 +47,14 @@ export const MemoryEntryTypeSchema = z.enum([
   'fact', // Objective knowledge
 ]);
 
+/** Structured fact schema */
+export const MemoryFactSchema = z.object({
+  key: z.string().min(1).max(100),
+  value: z.string().min(1).max(200),
+  confidence: z.number().min(0).max(1),
+  source: z.enum(['rule', 'llm', 'manual']),
+});
+
 // ============================================================================
 // Memory Schemas
 // ============================================================================
@@ -58,6 +66,7 @@ export const MemoryFrontMatterSchema = z.object({
   updated_at: ISO8601TimestampSchema,
   session_id: UUIDSchema.optional(),
   entry_type: MemoryEntryTypeSchema.optional(),
+  facts: z.array(MemoryFactSchema).optional(),
   tags: z.array(TagSchema).default([]),
   category: CategorySchema.default('general'),
   importance: ImportanceSchema.default(3),
@@ -70,6 +79,7 @@ export const MemorySchema = z.object({
   updatedAt: ISO8601TimestampSchema,
   sessionId: UUIDSchema.optional(),
   entryType: MemoryEntryTypeSchema.optional(),
+  facts: z.array(MemoryFactSchema).readonly().optional(),
   tags: z.array(z.string()).readonly(),
   category: CategorySchema,
   importance: ImportanceSchema,

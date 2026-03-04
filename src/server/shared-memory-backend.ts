@@ -427,16 +427,15 @@ export class SharedMemoryBackend implements MemoryBackend {
       socket.on('data', (chunk: string) => {
         buffer += chunk;
 
-        while (true) {
-          const newlineIndex = buffer.indexOf('\n');
-          if (newlineIndex === -1) break;
-
+        let newlineIndex = buffer.indexOf('\n');
+        while (newlineIndex !== -1) {
           const line = buffer.slice(0, newlineIndex).trim();
           buffer = buffer.slice(newlineIndex + 1);
 
           if (!line) continue;
 
           void this.handleSocketRequest(socket, line);
+          newlineIndex = buffer.indexOf('\n');
         }
       });
     });
