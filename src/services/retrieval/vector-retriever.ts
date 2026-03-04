@@ -38,7 +38,11 @@ export class VectorRetrieverAdapter implements VectorRetriever {
         const memory = await this.deps.readMemoryById(item.id);
         if (!memory) continue;
         if (input.category && memory.category !== input.category) continue;
-        if (input.tags && input.tags.length > 0 && !input.tags.every(tag => memory.tags.includes(tag))) {
+        if (
+          input.tags &&
+          input.tags.length > 0 &&
+          !input.tags.every(tag => memory.tags.includes(tag))
+        ) {
           continue;
         }
 
@@ -54,6 +58,8 @@ export class VectorRetrieverAdapter implements VectorRetriever {
       }
     }
 
-    return Array.from(dedup.values()).sort((a, b) => b.score - a.score).slice(0, input.limit);
+    return Array.from(dedup.values())
+      .sort((a, b) => b.score - a.score)
+      .slice(0, input.limit);
   }
 }

@@ -41,10 +41,7 @@ describe('ModelCrossEncoderReranker', () => {
 
     const input = {
       query: 'query',
-      candidates: [
-        candidate('a', 'A', 'normal memory'),
-        candidate('b', 'B', 'target memory'),
-      ],
+      candidates: [candidate('a', 'A', 'normal memory'), candidate('b', 'B', 'target memory')],
     };
 
     const output = await reranker.rerank(input);

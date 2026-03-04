@@ -13,6 +13,15 @@ import { AGENTS, type AgentType } from './types.js';
 import { initAgent, selectAgentInteractive } from './init.js';
 import { createMcpServer } from '../server/mcp-server.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import {
+  MODELS,
+  formatBytes,
+  TOTAL_DOWNLOAD_SIZE,
+  getDownloadStatus,
+  downloadAllModels,
+  isModelDownloaded,
+  type DownloadProgress,
+} from '../services/model-manager/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -46,25 +55,26 @@ function printHelp(): void {
 MemHub CLI v${VERSION} - Git-friendly memory for AI agents
 
 Usage:
-  memhub                    Start MCP server (default)
-  memhub init [options]     Configure MemHub for your AI agent
-  memhub --help             Show this help message
-  memhub --version          Show version
+  memhub                       Start MCP server (default)
+  memhub install [options]     Download models and configure agent
+  memhub --help                Show this help message
+  memhub --version             Show version
 
 Options:
-  -a, --agent <agent>       Agent type (skip interactive selection)
-  -f, --force               Update existing configuration
-  -l, --local               Configure for current project (default: global)
+  -a, --agent <agent>          Agent type (skip interactive selection)
+  -f, --force                  Update existing configuration
+  -l, --local                  Configure for current project (default: global)
+  --skip-models                Skip model download (use existing models)
 
 Supported agents:
 ${AGENTS.map(a => `  ${a.id.padEnd(15)} ${a.name}`).join('\n')}
 
 Examples:
   memhub                               # Start MCP server
-  memhub init                          # Interactive selection (global)
-  memhub init --local                  # Interactive selection (project)
-  memhub init --agent cursor           # Configure for Cursor (global)
-  memhub init -a claude-code -l        # Configure for Claude Code (project)
+  memhub install                       # Download models + interactive selection
+  memhub install --local               # Download models + project config
+  memhub install --agent cursor        # Download models + configure for Cursor
+  memhub install --skip-models -a claude-code  # Skip download, configure agent
 `);
 }
 
@@ -97,16 +107,22 @@ async function runCli(args: string[]): Promise<void> {
     process.exit(0);
   }
 
-  if (command !== 'init') {
+  // Support both 'init' (deprecated) and 'install'
+  if (command !== 'install' && command !== 'init') {
     p.log.error(`Unknown command: ${command}`);
     p.log.info('Run "memhub --help" for usage information.');
     process.exit(1);
   }
 
-  // Parse init options
+  if (command === 'init') {
+    p.log.warn("'init' is deprecated, use 'install' instead");
+  }
+
+  // Parse install options
   let agent: AgentType | undefined;
   let force = false;
   let local = false;
+  let skipModels = false;
 
   for (let i = 1; i < args.length; i++) {
     const arg = args[i];
@@ -126,6 +142,8 @@ async function runCli(args: string[]): Promise<void> {
       force = true;
     } else if (arg === '-l' || arg === '--local') {
       local = true;
+    } else if (arg === '--skip-models') {
+      skipModels = true;
     } else {
       p.log.error(`Unknown option: ${arg}`);
       process.exit(1);
@@ -135,6 +153,78 @@ async function runCli(args: string[]): Promise<void> {
   // Start interactive session
   p.intro(`MemHub v${VERSION}`);
 
+  // Step 1: Check and download models
+  if (!skipModels) {
+    const status = await getDownloadStatus();
+
+    if (status.missing === 0) {
+      p.log.success('All models already downloaded');
+    } else {
+      // Show download summary
+      p.log.info(
+        `MemHub needs to download ${status.missing} model(s) (~${formatBytes(TOTAL_DOWNLOAD_SIZE - status.downloadedSize)}):`
+      );
+      for (const model of MODELS) {
+        const downloaded = isModelDownloaded(model);
+        const modelStatus = downloaded ? '✓' : '○';
+        p.log.info(
+          `  ${modelStatus} ${model.kind}: ${model.name} (~${formatBytes(model.sizeBytes)})`
+        );
+      }
+
+      // Confirm download
+      const shouldDownload = await p.confirm({
+        message: 'Download models now?',
+        initialValue: true,
+      });
+
+      if (p.isCancel(shouldDownload) || !shouldDownload) {
+        p.cancel('Operation cancelled.');
+        process.exit(0);
+      }
+
+      // Download models with progress
+      const downloadSpinner = p.spinner();
+      let currentModel = '';
+
+      const result = await downloadAllModels((progress: DownloadProgress) => {
+        if (progress.model.name !== currentModel) {
+          if (currentModel) {
+            downloadSpinner.stop(`✓ ${currentModel}`);
+          }
+          currentModel = progress.model.name;
+
+          if (progress.status === 'skipped') {
+            downloadSpinner.start(`✓ ${currentModel} (already downloaded)`);
+          } else if (progress.status === 'resuming') {
+            downloadSpinner.start(`↻ ${currentModel} (resuming from ${progress.percentage}%)`);
+          } else {
+            downloadSpinner.start(`↓ ${currentModel}... ${progress.percentage}%`);
+          }
+        } else if (progress.status === 'downloading') {
+          downloadSpinner.message(`↓ ${currentModel}... ${progress.percentage}%`);
+        }
+      });
+
+      // Stop the last spinner
+      if (currentModel) {
+        downloadSpinner.stop(`✓ ${currentModel}`);
+      }
+
+      if (!result.success) {
+        for (const error of result.errors) {
+          p.log.error(error);
+        }
+        process.exit(1);
+      }
+
+      p.log.success('All models downloaded');
+    }
+  } else {
+    p.log.info('Skipping model download');
+  }
+
+  // Step 2: Configure agent
   // If no agent specified, run interactive selection
   if (!agent) {
     const selectedAgent = await selectAgentInteractive();

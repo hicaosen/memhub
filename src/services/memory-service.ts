@@ -167,22 +167,24 @@ export class MemoryService {
           })
         : undefined;
 
-    this.retrievalPipeline = new RetrievalPipeline({
-      listMemories: async input => {
-        const listed = await this.list({
-          category: input.category,
-          tags: input.tags,
-          limit: 1000,
-        });
-        return listed.memories;
+    this.retrievalPipeline = new RetrievalPipeline(
+      {
+        listMemories: async input => {
+          const listed = await this.list({
+            category: input.category,
+            tags: input.tags,
+            limit: 1000,
+          });
+          return listed.memories;
+        },
+        vectorRetriever,
       },
-      vectorRetriever,
-    }, {
-      reranker: createReranker({
-        mode: config.rerankerMode ?? 'auto',
-        modelName: config.rerankerModelName,
-      }),
-    });
+      {
+        reranker: createReranker({
+          mode: config.rerankerMode ?? 'auto',
+        }),
+      }
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -241,7 +243,7 @@ export class MemoryService {
         id,
         createdAt: now,
         updatedAt: now,
-        facts: this.factExtractor.extract({
+        facts: await this.factExtractor.extract({
           title: input.title,
           content: input.content,
         }),
@@ -315,7 +317,7 @@ export class MemoryService {
         ...(input.category !== undefined && { category: input.category }),
         ...(input.importance !== undefined && { importance: input.importance }),
       };
-      updated.facts = this.factExtractor.extract({
+      updated.facts = await this.factExtractor.extract({
         title: updated.title,
         content: updated.content,
       });
@@ -597,7 +599,7 @@ export class MemoryService {
           ...(input.category !== undefined && { category: input.category }),
           ...(input.importance !== undefined && { importance: input.importance }),
         };
-        updatedMemory.facts = this.factExtractor.extract({
+        updatedMemory.facts = await this.factExtractor.extract({
           title: updatedMemory.title,
           content: updatedMemory.content,
         });
@@ -622,7 +624,7 @@ export class MemoryService {
         updatedAt: now,
         sessionId,
         entryType: input.entryType,
-        facts: this.factExtractor.extract({
+        facts: await this.factExtractor.extract({
           title: input.title ?? 'memory note',
           content: input.content,
         }),

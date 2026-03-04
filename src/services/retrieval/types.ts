@@ -54,15 +54,15 @@ export interface RetrievalPipelineContext {
 }
 
 export interface QueryRewriter {
-  rewrite(query: string): RewriteOutput;
+  rewrite(query: string): Promise<RewriteOutput>;
 }
 
 export interface IntentRouter {
-  route(query: string): IntentRoute;
+  route(query: string): Promise<IntentRoute>;
 }
 
 export interface FactExtractor {
-  extract(input: { title: string; content: string }): readonly MemoryFact[];
+  extract(input: { title: string; content: string }): Promise<readonly MemoryFact[]>;
 }
 
 export interface Reranker {
@@ -74,4 +74,18 @@ export interface Reranker {
 
 export interface RetrievalPipelinePort {
   search(input: SearchMemoryInput): Promise<{ results: SearchResult[]; total: number }>;
+}
+
+export interface LlmTaskAssistant {
+  routeIntent(query: string): Promise<IntentRoute | null>;
+  rewriteQuery(query: string): Promise<RewriteOutput | null>;
+  extractFacts(input: { title: string; content: string }): Promise<readonly MemoryFact[] | null>;
+}
+
+export type LlmAssistantMode = 'disabled' | 'auto';
+
+export interface LlmAssistantConfig {
+  readonly mode?: LlmAssistantMode;
+  readonly modelPath?: string;
+  readonly threads?: number;
 }

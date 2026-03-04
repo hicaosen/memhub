@@ -9,8 +9,8 @@ import { join } from 'path';
 import { VectorIndex } from '../../src/storage/vector-index.js';
 import type { Memory } from '../../src/contracts/types.js';
 
-/** Build a random 384-dim float vector (avoids loading the real model) */
-function randomVec(dim = 384): number[] {
+/** Build a random 1024-dim float vector (avoids loading the real model) */
+function randomVec(dim = 1024): number[] {
   const vec = Array.from({ length: dim }, () => Math.random() * 2 - 1);
   // L2-normalise so cosine distance is meaningful
   const norm = Math.sqrt(vec.reduce((s, v) => s + v * v, 0));

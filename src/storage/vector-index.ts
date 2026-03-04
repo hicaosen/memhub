@@ -11,6 +11,9 @@ import { join } from 'path';
 import { constants } from 'fs';
 import type { Memory } from '../contracts/types.js';
 
+/** Vector dimension for bge-m3 embedding model */
+const VECTOR_DIM = 1024;
+
 const TABLE_NAME = 'memories';
 
 /** Escape single quotes in id strings to prevent SQL injection */
@@ -80,7 +83,7 @@ export class VectorIndex {
       // Create table with a dummy row so schema is established, then delete it
       const dummy: VectorRow = {
         id: '__init__',
-        vector: new Array(384).fill(0) as number[],
+        vector: new Array(VECTOR_DIM).fill(0) as number[],
         title: '',
         category: '',
         tags: '[]',
@@ -134,7 +137,7 @@ export class VectorIndex {
   /**
    * Searches for the nearest neighbours to `vector`.
    *
-   * @param vector - Query embedding (must be 384-dim)
+   * @param vector - Query embedding (must be VECTOR_DIM-dim)
    * @param limit  - Max results to return
    * @returns Array ordered by ascending distance (most similar first)
    */

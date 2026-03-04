@@ -239,7 +239,9 @@ describe('MemoryService Edge Cases', () => {
 
       (
         memoryService as unknown as {
-          retrievalPipeline: { search: (input: { query: string }) => Promise<{ results: []; total: 0 }> };
+          retrievalPipeline: {
+            search: (input: { query: string }) => Promise<{ results: []; total: 0 }>;
+          };
         }
       ).retrievalPipeline = {
         search: async () => ({ results: [], total: 0 }),

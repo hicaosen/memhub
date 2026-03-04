@@ -32,7 +32,10 @@ function tokenize(text: string): string[] {
   return Array.from(new Set(pieces));
 }
 
-function scoreKeywordMatch(memory: Memory, variants: readonly string[]): { score: number; matches: string[] } {
+function scoreKeywordMatch(
+  memory: Memory,
+  variants: readonly string[]
+): { score: number; matches: string[] } {
   const textTitle = memory.title.toLowerCase();
   const textContent = memory.content.toLowerCase();
   const matches: string[] = [];
@@ -47,7 +50,10 @@ function scoreKeywordMatch(memory: Memory, variants: readonly string[]): { score
     if (textContent.includes(variant)) {
       score += 0.3;
       const idx = textContent.indexOf(variant);
-      const snippet = memory.content.slice(Math.max(0, idx - 20), Math.min(memory.content.length, idx + 40));
+      const snippet = memory.content.slice(
+        Math.max(0, idx - 20),
+        Math.min(memory.content.length, idx + 40)
+      );
       matches.push(snippet);
     }
     for (const tag of memory.tags) {
@@ -59,7 +65,9 @@ function scoreKeywordMatch(memory: Memory, variants: readonly string[]): { score
   }
 
   const queryTokens = new Set(variants.flatMap(tokenize));
-  const memoryTokens = new Set(tokenize(`${memory.title} ${memory.content} ${(memory.tags ?? []).join(' ')}`));
+  const memoryTokens = new Set(
+    tokenize(`${memory.title} ${memory.content} ${(memory.tags ?? []).join(' ')}`)
+  );
   let overlap = 0;
   for (const token of queryTokens) {
     if (memoryTokens.has(token)) overlap += 1;
@@ -101,8 +109,8 @@ export class RetrievalPipeline {
   }
 
   async search(input: SearchMemoryInput): Promise<{ results: SearchResult[]; total: number }> {
-    const routed = this.intentRouter.route(input.query);
-    const rewritten = this.queryRewriter.rewrite(input.query);
+    const routed = await this.intentRouter.route(input.query);
+    const rewritten = await this.queryRewriter.rewrite(input.query);
     const limit = input.limit ?? 10;
 
     const memories = await this.context.listMemories({
@@ -180,7 +188,9 @@ export class RetrievalPipeline {
       });
     }
 
-    const topCandidates = candidates.sort((a, b) => b.finalScore - a.finalScore).slice(0, Math.max(limit * 3, 20));
+    const topCandidates = candidates
+      .sort((a, b) => b.finalScore - a.finalScore)
+      .slice(0, Math.max(limit * 3, 20));
     const reranked = await this.reranker.rerank({
       query: rewritten.normalized,
       candidates: topCandidates,
