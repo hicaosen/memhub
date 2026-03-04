@@ -5,8 +5,9 @@
  */
 
 import { readFileSync, existsSync } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
+import { homedir } from 'os';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -39,10 +40,33 @@ if (!existsSync(packageJsonPath)) {
 const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as PackageJson;
 
 /**
+ * Resolve storage path with the following priority:
+ * 1. MEMHUB_STORAGE_PATH env var (if set):
+ *    - Absolute path: use as-is
+ *    - Relative path starting with '.': resolve from current working directory
+ * 2. Default: ~/.memhub (user home directory)
+ */
+export function resolveStoragePath(): string {
+  const envPath = process.env.MEMHUB_STORAGE_PATH;
+
+  if (envPath) {
+    // If it's an absolute path, use as-is
+    if (envPath.startsWith('/') || envPath.match(/^[A-Z]:\\/i)) {
+      return envPath;
+    }
+    // Relative path: resolve from current working directory
+    return resolve(process.cwd(), envPath);
+  }
+
+  // Default: ~/.memhub
+  return join(homedir(), '.memhub');
+}
+
+/**
  * Create McpServer instance using SDK
  */
 export function createMcpServer(): Server {
-  const storagePath = process.env.MEMHUB_STORAGE_PATH || './memories';
+  const storagePath = resolveStoragePath();
   const vectorSearch = process.env.MEMHUB_VECTOR_SEARCH !== 'false';
   const memoryService = new MemoryService({ storagePath, vectorSearch });
 

@@ -5,9 +5,9 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'fs';
-import { tmpdir } from 'os';
-import { join } from 'path';
-import { createMcpServer } from '../../src/server/mcp-server.js';
+import { tmpdir, homedir } from 'os';
+import { join, resolve } from 'path';
+import { createMcpServer, resolveStoragePath } from '../../src/server/mcp-server.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
   TOOL_DEFINITIONS,
@@ -164,6 +164,47 @@ describe('McpServer (SDK)', () => {
       expect(validInput.query).toBe('test query');
       expect(validInput.limit).toBe(10);
       expect(validInput.category).toBe('general');
+    });
+  });
+
+  describe('resolveStoragePath', () => {
+    const originalEnv = process.env.MEMHUB_STORAGE_PATH;
+    const originalCwd = process.cwd.bind(process);
+
+    afterEach(() => {
+      if (originalEnv === undefined) {
+        delete process.env.MEMHUB_STORAGE_PATH;
+      } else {
+        process.env.MEMHUB_STORAGE_PATH = originalEnv;
+      }
+      process.cwd = originalCwd;
+    });
+
+    it('should return ~/.memhub by default', () => {
+      delete process.env.MEMHUB_STORAGE_PATH;
+      const expectedPath = join(homedir(), '.memhub');
+      expect(resolveStoragePath()).toBe(expectedPath);
+    });
+
+    it('should use absolute path from MEMHUB_STORAGE_PATH', () => {
+      const absolutePath = process.platform === 'win32' ? 'C:\\custom\\path' : '/custom/path';
+      process.env.MEMHUB_STORAGE_PATH = absolutePath;
+      expect(resolveStoragePath()).toBe(absolutePath);
+    });
+
+    it('should resolve relative path from cwd', () => {
+      const cwd = process.platform === 'win32' ? 'C:\\project' : '/project';
+      process.cwd = () => cwd;
+      process.env.MEMHUB_STORAGE_PATH = '.memhub';
+      expect(resolveStoragePath()).toBe(resolve(cwd, '.memhub'));
+    });
+
+    it('should resolve .memhub relative path', () => {
+      const cwd = process.platform === 'win32' ? 'C:\\myproject' : '/myproject';
+      process.cwd = () => cwd;
+      process.env.MEMHUB_STORAGE_PATH = '.memhub';
+      const expected = process.platform === 'win32' ? 'C:\\myproject\\.memhub' : '/myproject/.memhub';
+      expect(resolveStoragePath()).toBe(expected);
     });
   });
 });
