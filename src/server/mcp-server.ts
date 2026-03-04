@@ -11,10 +11,11 @@ import { homedir } from 'os';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { MemoryService, ServiceError } from '../services/memory-service.js';
+import { ServiceError } from '../services/memory-service.js';
 import { MemoryLoadInputSchema, MemoryUpdateInputV2Schema } from '../contracts/schemas.js';
 import { TOOL_DEFINITIONS, SERVER_INFO } from '../contracts/mcp.js';
 import { ErrorCode } from '../contracts/types.js';
+import { SharedMemoryBackend, type MemoryBackend } from './shared-memory-backend.js';
 
 // Get package version
 const __filename = fileURLToPath(import.meta.url);
@@ -62,7 +63,7 @@ export function resolveStoragePath(): string {
 export function createMcpServer(): Server {
   const storagePath = resolveStoragePath();
   const vectorSearch = process.env.MEMHUB_VECTOR_SEARCH !== 'false';
-  const memoryService = new MemoryService({ storagePath, vectorSearch });
+  const memoryBackend: MemoryBackend = new SharedMemoryBackend({ storagePath, vectorSearch });
 
   // Create server using SDK
   const server = new Server(
@@ -93,13 +94,13 @@ export function createMcpServer(): Server {
       switch (name) {
         case 'memory_load': {
           const input = MemoryLoadInputSchema.parse(args ?? {});
-          result = await memoryService.memoryLoad(input);
+          result = await memoryBackend.memoryLoad(input);
           break;
         }
 
         case 'memory_update': {
           const input = MemoryUpdateInputV2Schema.parse(args ?? {});
-          result = await memoryService.memoryUpdate(input);
+          result = await memoryBackend.memoryUpdate(input);
           break;
         }
 
