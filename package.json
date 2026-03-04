@@ -6,7 +6,7 @@
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "bin": {
-    "memhub": "dist/src/server/mcp-server.js"
+    "memhub": "dist/src/cli/index.js"
   },
   "scripts": {
     "build": "tsc",
@@ -32,6 +32,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@clack/prompts": "^1.1.0",
     "@lancedb/lancedb": "^0.26.2",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@xenova/transformers": "^2.17.2",

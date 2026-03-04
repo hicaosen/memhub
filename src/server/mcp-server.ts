@@ -149,7 +149,7 @@ export function createMcpServer(): Server {
 }
 
 /**
- * Start the MCP server
+ * Start the MCP server (only when run directly)
  */
 async function main(): Promise<void> {
   const server = createMcpServer();
@@ -159,19 +159,11 @@ async function main(): Promise<void> {
   console.error('MemHub MCP Server running on stdio');
 }
 
-main().catch(error => {
-  console.error('Fatal error:', error);
-  process.exit(1);
-});
-
-// Check if this file is being run directly
+// Only run main() when this file is executed directly
 const isMain = import.meta.url === `file://${process.argv[1]}` || false;
 if (isMain) {
-  // Defer main() execution to avoid blocking module loading
-  setImmediate(() => {
-    main().catch(error => {
-      console.error('Fatal error:', error);
-      process.exit(1);
-    });
+  main().catch(error => {
+    console.error('Fatal error:', error);
+    process.exit(1);
   });
 }
