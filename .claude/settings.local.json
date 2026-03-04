@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx pnpm:*)",
+      "mcp__web-search-prime__webSearchPrime",
+      "Bash(grep:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx eslint:*)",
+      "Bash(rm:*)",
+      "Bash(node:*)",
+      "Bash(curl:*)",
+      "mcp__web-reader__webReader",
+      "WebSearch",
+      "mcp__zread__get_repo_structure",
+      "Bash(sed:*)",
+      "Bash(npx vitest:*)"
+    ]
+  }
+}

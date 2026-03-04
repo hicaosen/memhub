@@ -24,9 +24,22 @@ import type {
 import { ErrorCode } from '../contracts/types.js';
 import { MarkdownStorage, StorageError } from '../storage/markdown-storage.js';
 import lockfile from 'proper-lockfile';
-import { RuleBasedFactExtractor } from './retrieval/fact-extractor.js';
+import { getModelByKind, resolveModelPath } from './model-manager/index.js';
+import {
+  AssistedFactExtractor,
+  RuleBasedFactExtractor,
+} from './retrieval/fact-extractor.js';
+import { AssistedIntentRouter, RuleBasedIntentRouter } from './retrieval/intent-router.js';
+import { NodeLlamaTaskAssistant } from './retrieval/llm-assistant.js';
 import { RetrievalPipeline } from './retrieval/pipeline.js';
-import type { FactExtractor, VectorRetriever } from './retrieval/types.js';
+import { AssistedQueryRewriter, RuleBasedQueryRewriter } from './retrieval/query-rewriter.js';
+import type {
+  FactExtractor,
+  IntentRouter,
+  LlmTaskAssistant,
+  QueryRewriter,
+  VectorRetriever,
+} from './retrieval/types.js';
 import { VectorRetrieverAdapter } from './retrieval/vector-retriever.js';
 import { createReranker, type RerankerMode } from './retrieval/reranker.js';
 
@@ -81,6 +94,19 @@ export interface MemoryServiceConfig {
    * @default BAAI/bge-reranker-v2-m3
    */
   rerankerModelName?: string;
+  /**
+   * LLM assistant mode for intent routing, query rewrite and fact extraction.
+   * @default auto
+   */
+  llmAssistantMode?: 'auto' | 'disabled';
+  /**
+   * Optional LLM model path override for assistant.
+   */
+  llmAssistantModelPath?: string;
+  /**
+   * Optional thread count for assistant LLM.
+   */
+  llmAssistantThreads?: number;
 }
 
 /**
@@ -149,7 +175,31 @@ export class MemoryService {
       this.embedding = null;
     }
 
-    this.factExtractor = new RuleBasedFactExtractor();
+    const llmAssistant = this.createLlmAssistant(config);
+    const ruleFactExtractor = new RuleBasedFactExtractor();
+    const ruleIntentRouter = new RuleBasedIntentRouter();
+    const ruleQueryRewriter = new RuleBasedQueryRewriter();
+
+    this.factExtractor = llmAssistant
+      ? new AssistedFactExtractor({
+          assistant: llmAssistant,
+          fallback: ruleFactExtractor,
+        })
+      : ruleFactExtractor;
+
+    const intentRouter: IntentRouter = llmAssistant
+      ? new AssistedIntentRouter({
+          assistant: llmAssistant,
+          fallback: ruleIntentRouter,
+        })
+      : ruleIntentRouter;
+
+    const queryRewriter: QueryRewriter = llmAssistant
+      ? new AssistedQueryRewriter({
+          assistant: llmAssistant,
+          fallback: ruleQueryRewriter,
+        })
+      : ruleQueryRewriter;
 
     const vectorRetriever: VectorRetriever | undefined =
       this.vectorSearchEnabled && this.vectorIndex && this.embedding
@@ -180,11 +230,43 @@ export class MemoryService {
         vectorRetriever,
       },
       {
+        intentRouter,
+        queryRewriter,
         reranker: createReranker({
           mode: config.rerankerMode ?? 'auto',
         }),
       }
     );
+  }
+
+  private createLlmAssistant(config: MemoryServiceConfig): LlmTaskAssistant | null {
+    const mode = config.llmAssistantMode ?? (process.env.NODE_ENV === 'test' ? 'disabled' : 'auto');
+    if (mode === 'disabled') {
+      return null;
+    }
+
+    try {
+      const model = getModelByKind('llm');
+      if (!model) {
+        return null;
+      }
+      const resolved = resolveModelPath(model);
+      if (!resolved.exists && !config.llmAssistantModelPath) {
+        return null;
+      }
+
+      return new NodeLlamaTaskAssistant({
+        mode: 'auto',
+        modelPath: config.llmAssistantModelPath ?? resolved.modelFile,
+        threads: config.llmAssistantThreads,
+      });
+    } catch (error) {
+      console.warn(
+        '[MemHub] Failed to initialize LLM assistant, using rule-only retrieval:',
+        error
+      );
+      return null;
+    }
   }
 
   // ---------------------------------------------------------------------------
