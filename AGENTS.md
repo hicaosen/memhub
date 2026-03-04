@@ -26,6 +26,8 @@ npx pnpm run quality
 | `npx pnpm run build` | Compile TypeScript |
 | `npx pnpm run lint` | ESLint check |
 | `npx pnpm run lint:fix` | Auto-fix lint issues |
+| `npx pnpm run format` | Format code with Prettier |
+| `npx pnpm run format:check` | Check code formatting |
 | `npx pnpm run typecheck` | TypeScript type check |
 | `npx pnpm run test` | Run Vitest tests |
 | `npx pnpm run test:watch` | Watch mode tests |
