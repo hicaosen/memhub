@@ -210,19 +210,6 @@ describe('MemoryService Edge Cases', () => {
       expect(result.results.length).toBeLessThanOrEqual(1);
     });
 
-    it('should search with category filter', async () => {
-      await memoryService.create({
-        title: 'Work Item',
-        content: 'Work content',
-        category: 'work',
-      });
-      const result = await memoryService.search({
-        query: 'work',
-        category: 'work',
-      });
-      expect(result.results.length).toBeGreaterThan(0);
-    });
-
     it('should fallback to keyword search when retrieval pipeline returns empty', async () => {
       await memoryService.create({
         title: 'Project Planning',

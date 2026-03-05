@@ -47,8 +47,6 @@ describe('VectorRetrieverAdapter', () => {
       query: '下班时间',
       variants: ['下班', '加班', '收工'],
       limit: 5,
-      category: 'work',
-      tags: ['schedule'],
     });
 
     expect(hits).toHaveLength(1);
@@ -56,7 +54,7 @@ describe('VectorRetrieverAdapter', () => {
     expect(hits[0].score).toBeCloseTo(0.9, 5);
   });
 
-  it('applies category and tag filters and skips missing memory records', async () => {
+  it('skips missing memory records', async () => {
     const inCategory = makeMemory({
       id: '550e8400-e29b-41d4-a716-446655440002',
       category: 'work',
@@ -99,12 +97,11 @@ describe('VectorRetrieverAdapter', () => {
       query: 'focus',
       variants: ['focus'],
       limit: 10,
-      category: 'work',
-      tags: ['focus'],
     });
 
-    expect(hits).toHaveLength(1);
-    expect(hits[0].id).toBe(inCategory.id);
-    expect(hits[0].matches).toEqual(['Work note']);
+    expect(hits).toHaveLength(3);
+    expect(hits.map(hit => hit.id)).toEqual(
+      expect.arrayContaining([inCategory.id, wrongCategory.id, wrongTag.id])
+    );
   });
 });

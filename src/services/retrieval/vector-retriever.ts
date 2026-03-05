@@ -27,8 +27,6 @@ export class VectorRetrieverAdapter implements VectorRetriever {
     query: string;
     variants: readonly string[];
     limit: number;
-    category?: string;
-    tags?: readonly string[];
   }): Promise<readonly VectorHit[]> {
     const dedup = new Map<string, VectorHit>();
     const now = new Date();
@@ -41,14 +39,6 @@ export class VectorRetrieverAdapter implements VectorRetriever {
         if (!memory) continue;
         // Skip expired memories
         if (isExpired(memory.expiresAt, now)) continue;
-        if (input.category && memory.category !== input.category) continue;
-        if (
-          input.tags &&
-          input.tags.length > 0 &&
-          !input.tags.every(tag => memory.tags.includes(tag))
-        ) {
-          continue;
-        }
 
         const score = distanceToScore(item._distance);
         const exists = dedup.get(item.id);

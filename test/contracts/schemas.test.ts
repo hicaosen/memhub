@@ -300,12 +300,10 @@ describe('Schema Validation', () => {
       expect(SearchMemoryInputSchema.safeParse(input).success).toBe(false);
     });
 
-    it('should accept search with filters', () => {
+    it('should accept search with limit', () => {
       const input = {
         query: 'project',
         limit: 20,
-        category: 'work',
-        tags: ['important'],
       };
       expect(SearchMemoryInputSchema.safeParse(input).success).toBe(true);
     });

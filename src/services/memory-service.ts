@@ -374,7 +374,6 @@ export class MemoryService implements VectorIndexScheduler {
     try {
       const result = await this.retrievalPipeline.search({
         query: input.query,
-        category: input.category,
         intents: {
           primary: 'semantic',
           fallbacks: ['keyword', 'hybrid'],

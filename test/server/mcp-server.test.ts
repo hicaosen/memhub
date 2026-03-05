@@ -37,7 +37,7 @@ describe('McpServer (SDK)', () => {
   });
 
   afterEach(() => {
-    rmSync(tempDir, { recursive: true, force: true });
+    rmSync(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
     delete process.env.MEMHUB_STORAGE_PATH;
     delete process.env.MEMHUB_VECTOR_SEARCH;
     delete process.env.MEMHUB_RERANKER_MODE;

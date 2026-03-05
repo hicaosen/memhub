@@ -7,7 +7,6 @@ import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { initAgent } from '../../src/cli/init.js';
 import { AGENTS, type AgentType } from '../../src/cli/types.js';
-import { parse as parseToml } from 'smol-toml';
 import {
   extractMemHubVersion,
   needsUpdate,
@@ -219,15 +218,10 @@ describe('CLI Init Command', () => {
 
       const configPath = join(TEST_DIR, '.codex/config.toml');
       const content = readFileSync(configPath, 'utf-8');
-      const config = parseToml(content) as Record<string, unknown>;
-      const servers = config.mcp_servers as Record<string, unknown>;
-      const memhub = servers.memhub as Record<string, unknown>;
-      const args = memhub.args as string[];
 
-      expect(config).toHaveProperty('mcp_servers');
-      expect(servers).toHaveProperty('memhub');
-      expect(memhub.command).toBe('npx');
-      expect(args).toContain('@synth-coder/memhub@latest');
+      expect(content).toContain('[mcp_servers.memhub]');
+      expect(content).toContain('command = "npx"');
+      expect(content).toContain('"@synth-coder/memhub@latest"');
     });
 
     it('should generate instructions with version tag', () => {

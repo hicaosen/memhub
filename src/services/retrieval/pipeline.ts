@@ -77,7 +77,6 @@ function scoreKeywordMatch(
 /** Internal input type with caller-provided intents and rewrites */
 interface PipelineSearchInput {
   readonly query: string;
-  readonly category?: string;
   readonly intents: {
     readonly primary: RetrievalIntent;
     readonly fallbacks: readonly [RetrievalIntent, RetrievalIntent];
@@ -160,11 +159,6 @@ export class RetrievalPipeline {
 
     const candidates: RetrievalCandidate[] = [];
     for (const state of stateById.values()) {
-      // Apply category filter if specified
-      if (input.category && state.memory.category !== input.category) {
-        continue;
-      }
-
       const scored = scoreCandidate({
         intent: intentMap[input.intents.primary],
         vectorScore: state.vectorScore,
