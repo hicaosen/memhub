@@ -79,16 +79,6 @@ Call this early to provide personalized, context-aware responses.`,
           type: 'string',
           description: 'Direct lookup by memory ID (if known)',
         },
-        category: {
-          type: 'string',
-          description:
-            'Filter by category: "general" (default), "preference", "decision", "knowledge", "project"',
-        },
-        tags: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Filter by tags. Example: ["typescript", "backend"]',
-        },
         limit: {
           type: 'number',
           description: 'Max results (default: 20, max: 100)',
@@ -117,7 +107,7 @@ WHAT TO STORE:
 TIPS:
 • content is required and most important
 • title helps with search (auto-generated if omitted)
-• Use entryType to categorize: "preference", "decision", "context", "fact"
+• Use entryType to categorize: "preference", "decision", "procedure", "constraint", "session"
 • importance: 1-5 (default: 3), higher = more critical to remember`,
     inputSchema: {
       type: 'object',
@@ -139,19 +129,9 @@ TIPS:
         },
         entryType: {
           type: 'string',
-          enum: ['preference', 'decision', 'context', 'fact'],
+          enum: ['preference', 'decision', 'procedure', 'constraint', 'session'],
           description:
-            'Type of memory. "preference" for user likes/dislikes, "decision" for choices made, "context" for project info, "fact" for learned facts',
-        },
-        category: {
-          type: 'string',
-          description:
-            'Category for grouping. Default: "general". Example: "frontend", "backend", "project-alpha"',
-        },
-        tags: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Tags for filtering. Example: ["typescript", "react", "coding-style"]',
+            'Type of memory. "preference" for user likes/dislikes, "decision" for choices made, "procedure" for reusable workflows, "constraint" for project boundaries, "session" for temporary context',
         },
         importance: {
           type: 'number',
@@ -210,8 +190,6 @@ export type ToolInput<T extends ToolName> = T extends 'memory_load'
   ? {
       id?: string;
       query?: string;
-      category?: string;
-      tags?: string[];
       limit?: number;
     }
   : T extends 'memory_update'
@@ -220,11 +198,9 @@ export type ToolInput<T extends ToolName> = T extends 'memory_load'
         sessionId?: string;
         idempotencyKey?: string;
         mode?: 'append' | 'upsert';
-        entryType?: 'preference' | 'decision' | 'context' | 'fact';
+        entryType?: 'preference' | 'decision' | 'procedure' | 'constraint' | 'session';
         title?: string;
         content: string;
-        tags?: string[];
-        category?: string;
         importance?: number;
       }
     : never;

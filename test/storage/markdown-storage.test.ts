@@ -223,4 +223,84 @@ importance: 3
       expect(filePath).toBeNull();
     });
   });
+
+  // ── #19: id→path in-memory index ────────────────────────────────────────────
+
+  describe('#19: idToPath cache', () => {
+    const MEM_ID = '123e4567-e89b-12d3-a456-426614174000';
+
+    const sampleMemory: Memory = {
+      id: MEM_ID,
+      createdAt: '2024-06-01T12:00:00.000Z',
+      updatedAt: '2024-06-01T12:00:00.000Z',
+      sessionId: '550e8400-e29b-41d4-a716-446655440999',
+      tags: [],
+      category: 'general',
+      importance: 3,
+      title: 'Cache Test',
+      content: 'testing cache',
+    };
+
+    it('write() should populate cache: getCacheSize() returns 1 after one write', async () => {
+      expect(storage.getCacheSize()).toBe(0);
+      await storage.write(sampleMemory);
+      expect(storage.getCacheSize()).toBe(1);
+    });
+
+    it('write() then findById() returns the correct path without full scan', async () => {
+      const writtenPath = await storage.write(sampleMemory);
+      const foundPath = await storage.findById(MEM_ID);
+      expect(foundPath).toBe(writtenPath);
+    });
+
+    it('delete() should evict cache: getCacheSize() returns 0 after delete', async () => {
+      await storage.write(sampleMemory);
+      expect(storage.getCacheSize()).toBe(1);
+      await storage.delete(MEM_ID);
+      expect(storage.getCacheSize()).toBe(0);
+    });
+
+    it('delete() should make findById() return null (no stale cache hit)', async () => {
+      await storage.write(sampleMemory);
+      await storage.delete(MEM_ID);
+      const result = await storage.findById(MEM_ID);
+      expect(result).toBeNull();
+    });
+
+    it('findById() on cache miss should scan disk and repopulate cache', async () => {
+      // Write a file externally (bypassing MarkdownStorage.write)
+      const { writeFileSync, mkdirSync } = await import('fs');
+      const dir = join(tempDir, '2024-06-01', '550e8400-e29b-41d4-a716-446655440999');
+      mkdirSync(dir, { recursive: true });
+      const externalPath = join(dir, 'external.md');
+      writeFileSync(
+        externalPath,
+        `---\nid: "${MEM_ID}"\ncreated_at: "2024-06-01T12:00:00.000Z"\nupdated_at: "2024-06-01T12:00:00.000Z"\ntags: []\ncategory: "general"\nimportance: 3\n---\n\n# Cache Test\n`
+      );
+
+      // cache is empty — must fall back to disk scan
+      expect(storage.getCacheSize()).toBe(0);
+      const result = await storage.findById(MEM_ID);
+      expect(result).toBe(externalPath);
+
+      // After scan the cache should be populated
+      expect(storage.getCacheSize()).toBe(1);
+
+      // Second call should hit cache
+      const result2 = await storage.findById(MEM_ID);
+      expect(result2).toBe(externalPath);
+    });
+
+    it('multiple writes populate cache correctly', async () => {
+      const ids = [
+        '00000000-0000-0000-0000-000000000001',
+        '00000000-0000-0000-0000-000000000002',
+        '00000000-0000-0000-0000-000000000003',
+      ];
+      for (const id of ids) {
+        await storage.write({ ...sampleMemory, id });
+      }
+      expect(storage.getCacheSize()).toBe(3);
+    });
+  });
 });

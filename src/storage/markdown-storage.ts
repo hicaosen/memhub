@@ -41,6 +41,8 @@ export interface StorageConfig {
  */
 export class MarkdownStorage {
   private readonly storagePath: string;
+  /** In-memory id→filePath index. Populated lazily on first scan and kept in sync by write/delete. */
+  private readonly idToPath = new Map<string, string>();
 
   constructor(config: StorageConfig) {
     this.storagePath = config.storagePath;
@@ -76,6 +78,7 @@ export class MarkdownStorage {
     try {
       await mkdir(directoryPath, { recursive: true });
       await writeFile(filePath, content, 'utf-8');
+      this.idToPath.set(memory.id, filePath);
       return filePath;
     } catch (error) {
       throw new StorageError(`Failed to write memory file: ${filename}`, error);
@@ -124,6 +127,7 @@ export class MarkdownStorage {
 
     try {
       await unlink(filePath);
+      this.idToPath.delete(id);
       return filePath;
     } catch (error) {
       throw new StorageError(`Failed to delete memory file: ${filePath}`, error);
@@ -169,6 +173,11 @@ export class MarkdownStorage {
    * @throws StorageError if search fails
    */
   async findById(id: string): Promise<string | null> {
+    // Fast path: cache hit
+    const cached = this.idToPath.get(id);
+    if (cached !== undefined) return cached;
+
+    // Slow path: full disk scan, rebuild cache
     await this.initialize();
 
     try {
@@ -178,8 +187,8 @@ export class MarkdownStorage {
         try {
           const content = await readFile(filePath, 'utf-8');
           const { frontMatter } = parseFrontMatter(content);
-          if (frontMatter.id === id) {
-            return filePath;
+          if (frontMatter.id) {
+            this.idToPath.set(frontMatter.id, filePath);
           }
         } catch {
           // Skip files that can't be parsed
@@ -187,10 +196,18 @@ export class MarkdownStorage {
         }
       }
 
-      return null;
+      return this.idToPath.get(id) ?? null;
     } catch (error) {
       throw new StorageError('Failed to search for memory file', error);
     }
+  }
+
+  /**
+   * Returns the current number of entries in the id→path cache.
+   * Exposed for testing purposes.
+   */
+  getCacheSize(): number {
+    return this.idToPath.size;
   }
 
   /**

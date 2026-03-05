@@ -181,8 +181,6 @@ export class SharedMemoryBackend implements MemoryBackend {
       meta: {
         hasId: !!inputWithIdempotencyKey.id,
         entryType: inputWithIdempotencyKey.entryType,
-        category: inputWithIdempotencyKey.category,
-        tagsCount: inputWithIdempotencyKey.tags?.length ?? 0,
         hasIdempotencyKey: !!inputWithIdempotencyKey.idempotencyKey,
       },
     });

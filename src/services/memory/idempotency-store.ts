@@ -43,10 +43,9 @@ export class FileIdempotencyStore implements IdempotencyStore {
       sessionId: input.sessionId ?? null,
       mode: input.mode ?? 'append',
       entryType: input.entryType ?? null,
+      ttl: input.ttl ?? null,
       title: input.title ?? null,
       content: input.content,
-      tags: input.tags ?? [],
-      category: input.category ?? null,
       importance: input.importance ?? null,
     };
 

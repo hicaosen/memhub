@@ -252,8 +252,6 @@ export const MemoryUpdateInputV2Schema = z.object({
   ttl: TTLLevelSchema.optional(),
   title: z.string().min(1).max(200).optional(),
   content: z.string().min(1).max(100000),
-  tags: z.array(TagSchema).readonly().optional(),
-  category: CategorySchema.optional(),
   importance: ImportanceSchema.optional(),
 });
 

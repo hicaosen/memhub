@@ -232,7 +232,7 @@ export class MemoryService implements VectorIndexScheduler {
     this.retrievalPipeline = new RetrievalPipeline(
       {
         listMemories: async () => {
-          const listed = await this.list({ limit: 1000 });
+          const listed = await this.list({ limit: 10000 });
           return listed.memories;
         },
         vectorRetriever,
@@ -314,25 +314,7 @@ export class MemoryService implements VectorIndexScheduler {
    * Reads a memory by ID
    */
   async read(input: ReadMemoryInput): Promise<{ memory: Memory }> {
-    try {
-      const memory = await this.storage.read(input.id);
-
-      // Check if expired
-      if (isExpired(memory.expiresAt, new Date())) {
-        throw new ServiceError(`Memory not found: ${input.id}`, ErrorCode.NOT_FOUND);
-      }
-
-      return { memory };
-    } catch (error) {
-      if (error instanceof ServiceError) throw error;
-      if (error instanceof StorageError && error.message.includes('not found')) {
-        throw new ServiceError(`Memory not found: ${input.id}`, ErrorCode.NOT_FOUND);
-      }
-      throw new ServiceError(
-        `Failed to read memory: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        ErrorCode.STORAGE_ERROR
-      );
-    }
+    return this.repository.read(input);
   }
 
   /**
@@ -494,6 +476,11 @@ export class MemoryService implements VectorIndexScheduler {
         }
 
         // Handle TTL update - recalculate expiresAt if ttl is provided
+        if (isExpired(existing.expiresAt, new Date(now))) {
+          throw new ServiceError(`Memory not found: ${input.id}`, ErrorCode.NOT_FOUND);
+        }
+
+        // Handle TTL - recalculate expiresAt if ttl is provided
         let expiresAt = existing.expiresAt;
         let ttl = existing.ttl;
         if (input.ttl !== undefined) {
@@ -509,14 +496,16 @@ export class MemoryService implements VectorIndexScheduler {
           entryType: input.entryType,
           ...(input.title !== undefined && { title: input.title }),
           ...(input.content !== undefined && { content: input.content }),
-          ...(input.tags !== undefined && { tags: input.tags }),
-          ...(input.category !== undefined && { category: input.category }),
           ...(input.importance !== undefined && { importance: input.importance }),
           ...(ttl !== undefined && { ttl }),
         };
 
         // WAL append first for durability
-        const walOffset = await this.wal.append('update', updatedMemory.id);
+        const walOffset = await this.wal.append(
+          'update',
+          updatedMemory.id,
+          JSON.stringify(updatedMemory)
+        );
 
         // Persist to disk
         const filePath = await this.storage.write(updatedMemory);
@@ -543,8 +532,8 @@ export class MemoryService implements VectorIndexScheduler {
           expiresAt,
           sessionId,
           entryType: input.entryType,
-          tags: input.tags ?? [],
-          category: input.category ?? 'general',
+          tags: [],
+          category: 'general',
           importance: input.importance ?? 3,
           title: input.title ?? 'memory note',
           content: input.content,
@@ -552,7 +541,7 @@ export class MemoryService implements VectorIndexScheduler {
         };
 
         // WAL append first for durability
-        const walOffset = await this.wal.append('create', id);
+        const walOffset = await this.wal.append('create', id, JSON.stringify(createdMemory));
 
         // Persist to disk
         const filePath = await this.storage.write(createdMemory);
