@@ -6,6 +6,7 @@ import type {
   RetrievalPipelineContext,
   Reranker,
 } from './types.js';
+import { isExpired } from '../memory/ttl-utils.js';
 
 interface InternalCandidateState {
   memory: Memory;
@@ -110,9 +111,13 @@ export class RetrievalPipeline {
 
     const limit = input.limit;
     const memories = await this.context.listMemories();
+    const now = new Date();
 
     const stateById = new Map<string, InternalCandidateState>();
     for (const memory of memories) {
+      // Skip expired memories
+      if (isExpired(memory.expiresAt, now)) continue;
+
       const keyword = scoreKeywordMatch(memory, variants);
       if (keyword.score === 0) continue;
 

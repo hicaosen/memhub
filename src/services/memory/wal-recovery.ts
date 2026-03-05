@@ -1,4 +1,4 @@
-import type { Memory } from '../../contracts/types.js';
+import type { Memory, WALEntry } from '../../contracts/types.js';
 import type { WALStorage } from '../../storage/wal.js';
 import type { Logger } from '../../utils/logger.js';
 
@@ -13,9 +13,10 @@ interface IEmbeddingService {
   embedMemory(title: string, content: string): Promise<number[]>;
 }
 
-/** Minimal interface for storage read operations */
+/** Minimal interface for storage operations */
 interface IStorage {
   read(id: string): Promise<Memory>;
+  write(memory: Memory): Promise<string>;
 }
 
 /**
@@ -60,8 +61,25 @@ export class WALRecovery {
           continue;
         }
 
-        // Read the memory from disk and re-index
-        const memory = await this.context.storage.read(entry.memoryId);
+        // Try to read the memory from disk
+        let memory: Memory;
+        try {
+          memory = await this.context.storage.read(entry.memoryId);
+        } catch {
+          // If read fails, try to recover from WAL entry data
+          if (entry.data) {
+            memory = this.parseMemoryFromEntry(entry);
+            // Reconstruct the memory file on disk
+            await this.context.storage.write(memory);
+            void this.context.logger.info(
+              'wal_recovery_reconstructed',
+              `Reconstructed memory ${entry.memoryId} from WAL data`
+            );
+          } else {
+            throw new Error('Memory not found and no data in WAL entry');
+          }
+        }
+
         if (this.context.vectorIndex && this.context.embedding) {
           const vec = await this.context.embedding.embedMemory(
             memory.title,
@@ -82,5 +100,17 @@ export class WALRecovery {
     }
 
     void this.context.logger.info('wal_recovery_complete', 'WAL recovery complete');
+  }
+
+  /**
+   * Parses memory data from a WAL entry.
+   * Used when disk read fails to reconstruct from WAL.
+   */
+  private parseMemoryFromEntry(entry: WALEntry): Memory {
+    const data = entry.data;
+    if (!data) {
+      throw new Error('No data in WAL entry');
+    }
+    return JSON.parse(data) as Memory;
   }
 }

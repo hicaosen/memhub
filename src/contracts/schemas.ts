@@ -10,10 +10,10 @@ import { z } from 'zod';
 // ============================================================================
 
 /** UUID v4 validation schema */
-export const UUIDSchema = z.string().uuid().brand<'UUID'>();
+export const UUIDSchema = z.string().uuid();
 
 /** ISO 8601 timestamp validation */
-export const ISO8601TimestampSchema = z.string().datetime().brand<'ISO8601'>();
+export const ISO8601TimestampSchema = z.string().datetime();
 
 /** Slug validation (URL-friendly string) */
 export const SlugSchema = z
@@ -70,7 +70,7 @@ export const MemoryFrontMatterSchema = z.object({
   session_id: UUIDSchema.optional(),
   entry_type: MemoryEntryTypeSchema.optional(),
   ttl: TTLLevelSchema.optional(),
-  tags: z.array(TagSchema).default([]),
+  tags: z.array(TagSchema).readonly().default([]),
   category: CategorySchema.default('general'),
   importance: ImportanceSchema.default(3),
 });
@@ -107,12 +107,12 @@ export const MemoryFileSchema = z.object({
 export const SearchResultSchema = z.object({
   memory: MemorySchema,
   score: z.number().min(0).max(1),
-  matches: z.array(z.string()),
+  matches: z.array(z.string()).readonly(),
 });
 
 /** List result schema */
 export const ListResultSchema = z.object({
-  memories: z.array(MemorySchema),
+  memories: z.array(MemorySchema).readonly(),
   total: z.number().int().nonnegative(),
   hasMore: z.boolean(),
 });
@@ -148,7 +148,7 @@ export const SortOrderSchema = z.enum(['asc', 'desc']);
 /** Memory filter schema */
 export const MemoryFilterSchema = z.object({
   category: CategorySchema.optional(),
-  tags: z.array(TagSchema).optional(),
+  tags: z.array(TagSchema).readonly().optional(),
   fromDate: ISO8601TimestampSchema.optional(),
   toDate: ISO8601TimestampSchema.optional(),
 });
@@ -171,9 +171,10 @@ export const SortOptionsSchema = z.object({
 
 /** Create memory input schema */
 export const CreateMemoryInputSchema = z.object({
+  ttl: TTLLevelSchema.optional(),
   title: z.string().min(1).max(200),
   content: z.string().max(100000),
-  tags: z.array(TagSchema).default([]),
+  tags: z.array(TagSchema).readonly().default([]),
   category: CategorySchema.default('general'),
   importance: ImportanceSchema.default(3),
 });
@@ -185,10 +186,11 @@ export const ReadMemoryInputSchema = z.object({
 
 /** Update memory input schema */
 export const UpdateMemoryInputSchema = z.object({
+  ttl: TTLLevelSchema.optional(),
   id: UUIDSchema,
   title: z.string().min(1).max(200).optional(),
   content: z.string().max(100000).optional(),
-  tags: z.array(TagSchema).optional(),
+  tags: z.array(TagSchema).readonly().optional(),
   category: CategorySchema.optional(),
   importance: ImportanceSchema.optional(),
 });
@@ -201,7 +203,7 @@ export const DeleteMemoryInputSchema = z.object({
 /** List memory input schema */
 export const ListMemoryInputSchema = z.object({
   category: CategorySchema.optional(),
-  tags: z.array(TagSchema).optional(),
+  tags: z.array(TagSchema).readonly().optional(),
   fromDate: ISO8601TimestampSchema.optional(),
   toDate: ISO8601TimestampSchema.optional(),
   limit: z.number().int().min(1).max(100).optional(),
@@ -215,7 +217,7 @@ export const SearchMemoryInputSchema = z.object({
   query: z.string().min(1).max(1000),
   limit: z.number().int().min(1).max(100).optional(),
   category: CategorySchema.optional(),
-  tags: z.array(TagSchema).optional(),
+  tags: z.array(TagSchema).readonly().optional(),
 });
 
 /** Retrieval intent schema */
@@ -250,7 +252,7 @@ export const MemoryUpdateInputV2Schema = z.object({
   ttl: TTLLevelSchema.optional(),
   title: z.string().min(1).max(200).optional(),
   content: z.string().min(1).max(100000),
-  tags: z.array(TagSchema).optional(),
+  tags: z.array(TagSchema).readonly().optional(),
   category: CategorySchema.optional(),
   importance: ImportanceSchema.optional(),
 });
@@ -271,7 +273,7 @@ export const ReadMemoryOutputSchema = z.object({
 export const UpdateMemoryOutputSchema = UpdateResultSchema;
 
 export const MemoryLoadOutputSchema = z.object({
-  items: z.array(MemorySchema),
+  items: z.array(MemorySchema).readonly(),
   total: z.number().int().nonnegative(),
 });
 
@@ -293,18 +295,18 @@ export const ListMemoryOutputSchema = ListResultSchema;
 
 /** Search memory output schema */
 export const SearchMemoryOutputSchema = z.object({
-  results: z.array(SearchResultSchema),
+  results: z.array(SearchResultSchema).readonly(),
   total: z.number().int().nonnegative(),
 });
 
 /** Get categories output schema */
 export const GetCategoriesOutputSchema = z.object({
-  categories: z.array(CategorySchema),
+  categories: z.array(CategorySchema).readonly(),
 });
 
 /** Get tags output schema */
 export const GetTagsOutputSchema = z.object({
-  tags: z.array(TagSchema),
+  tags: z.array(TagSchema).readonly(),
 });
 
 // ============================================================================
@@ -318,20 +320,54 @@ export const ConfigSchema = z.object({
 });
 
 // ============================================================================
-// Type Extraction from Schemas
+// Type Exports (inferred from schemas)
 // ============================================================================
 
-/** Inferred Memory type from schema */
-export type MemoryFromSchema = z.infer<typeof MemorySchema>;
+// Enum types
+export type MemoryEntryType = z.infer<typeof MemoryEntryTypeSchema>;
+export type TTLLevel = z.infer<typeof TTLLevelSchema>;
+export type SortField = z.infer<typeof SortFieldSchema>;
+export type SortOrder = z.infer<typeof SortOrderSchema>;
+export type RetrievalIntent = z.infer<typeof RetrievalIntentSchema>;
 
-/** Inferred CreateInput type from schema */
-export type CreateMemoryInputFromSchema = z.infer<typeof CreateMemoryInputSchema>;
+// Memory types
+export type Memory = z.infer<typeof MemorySchema>;
+export type MemoryFrontMatter = z.infer<typeof MemoryFrontMatterSchema>;
+export type MemoryFile = z.infer<typeof MemoryFileSchema>;
 
-/** Inferred UpdateInput type from schema */
-export type UpdateMemoryInputFromSchema = z.infer<typeof UpdateMemoryInputSchema>;
+// Result types
+export type SearchResult = z.infer<typeof SearchResultSchema>;
+export type ListResult = z.infer<typeof ListResultSchema>;
+export type CreateResult = z.infer<typeof CreateResultSchema>;
+export type UpdateResult = z.infer<typeof UpdateResultSchema>;
+export type DeleteResult = z.infer<typeof DeleteResultSchema>;
 
-/** Inferred ListInput type from schema */
-export type ListMemoryInputFromSchema = z.infer<typeof ListMemoryInputSchema>;
+// Filter and query types
+export type MemoryFilter = z.infer<typeof MemoryFilterSchema>;
+export type PaginationOptions = z.infer<typeof PaginationOptionsSchema>;
+export type SortOptions = z.infer<typeof SortOptionsSchema>;
 
-/** Inferred SearchInput type from schema */
-export type SearchMemoryInputFromSchema = z.infer<typeof SearchMemoryInputSchema>;
+// MCP tool input types
+export type CreateMemoryInput = z.infer<typeof CreateMemoryInputSchema>;
+export type ReadMemoryInput = z.infer<typeof ReadMemoryInputSchema>;
+export type UpdateMemoryInput = z.infer<typeof UpdateMemoryInputSchema>;
+export type DeleteMemoryInput = z.infer<typeof DeleteMemoryInputSchema>;
+export type ListMemoryInput = z.infer<typeof ListMemoryInputSchema>;
+export type SearchMemoryInput = z.infer<typeof SearchMemoryInputSchema>;
+export type MemoryLoadInput = z.infer<typeof MemoryLoadInputSchema>;
+export type MemoryUpdateInput = z.infer<typeof MemoryUpdateInputV2Schema>;
+
+// MCP tool output types
+export type CreateMemoryOutput = z.infer<typeof CreateMemoryOutputSchema>;
+export type ReadMemoryOutput = z.infer<typeof ReadMemoryOutputSchema>;
+export type UpdateMemoryOutput = z.infer<typeof UpdateMemoryOutputSchema>;
+export type MemoryLoadOutput = z.infer<typeof MemoryLoadOutputSchema>;
+export type MemoryUpdateOutput = z.infer<typeof MemoryUpdateOutputSchema>;
+export type DeleteMemoryOutput = z.infer<typeof DeleteMemoryOutputSchema>;
+export type ListMemoryOutput = z.infer<typeof ListMemoryOutputSchema>;
+export type SearchMemoryOutput = z.infer<typeof SearchMemoryOutputSchema>;
+export type GetCategoriesOutput = z.infer<typeof GetCategoriesOutputSchema>;
+export type GetTagsOutput = z.infer<typeof GetTagsOutputSchema>;
+
+// Configuration type
+export type Config = z.infer<typeof ConfigSchema>;

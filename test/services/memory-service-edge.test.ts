@@ -268,33 +268,6 @@ describe('MemoryService Edge Cases', () => {
     });
   });
 
-  describe('getCategories and getTags edge cases', () => {
-    it('should return sorted categories', async () => {
-      await memoryService.create({ title: 'A', content: 'C', category: 'zebra' });
-      await memoryService.create({ title: 'B', content: 'C', category: 'alpha' });
-      await memoryService.create({ title: 'C', content: 'C', category: 'beta' });
-
-      const result = await memoryService.getCategories();
-      expect(result.categories).toEqual(['alpha', 'beta', 'zebra']);
-    });
-
-    it('should return sorted tags', async () => {
-      await memoryService.create({ title: 'A', content: 'C', tags: ['zebra', 'alpha'] });
-      await memoryService.create({ title: 'B', content: 'C', tags: ['beta'] });
-
-      const result = await memoryService.getTags();
-      expect(result.tags).toEqual(['alpha', 'beta', 'zebra']);
-    });
-
-    it('should handle duplicate tags across memories', async () => {
-      await memoryService.create({ title: 'A', content: 'C', tags: ['shared'] });
-      await memoryService.create({ title: 'B', content: 'C', tags: ['shared'] });
-
-      const result = await memoryService.getTags();
-      expect(result.tags).toEqual(['shared']);
-    });
-  });
-
   describe('memory_update idempotency', () => {
     it('replays result for same idempotencyKey and payload', async () => {
       const input = {

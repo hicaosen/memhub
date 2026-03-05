@@ -13,13 +13,10 @@ import type {
   DeleteResult,
   ListResult,
   SearchResult,
-  GetCategoriesOutput,
-  GetTagsOutput,
   MemoryLoadInput,
   MemoryUpdateInput,
   MemoryLoadOutput,
   MemoryUpdateOutput,
-  TTLLevel,
 } from '../contracts/types.js';
 import { ErrorCode } from '../contracts/types.js';
 import { MarkdownStorage, StorageError } from '../storage/markdown-storage.js';
@@ -36,31 +33,9 @@ import {
   MemoryRepository,
   WALRecovery,
   type VectorIndexScheduler,
+  calculateExpiresAt,
+  isExpired,
 } from './memory/index.js';
-
-/** TTL durations in milliseconds */
-const TTL_DURATIONS: Record<TTLLevel, number | null> = {
-  permanent: null, // Never expire
-  long: 90 * 24 * 60 * 60 * 1000, // 90 days
-  medium: 30 * 24 * 60 * 60 * 1000, // 30 days
-  short: 7 * 24 * 60 * 60 * 1000, // 7 days
-  session: 24 * 60 * 60 * 1000, // 24 hours
-};
-
-/**
- * Calculates expiration timestamp from TTL level
- * @param ttl - The TTL level
- * @param createdAt - The creation timestamp
- * @returns ISO8601 expiration timestamp or undefined if permanent
- */
-function calculateExpiresAt(ttl: TTLLevel, createdAt: string): string | undefined {
-  const duration = TTL_DURATIONS[ttl];
-  if (duration === null) return undefined;
-  return new Date(new Date(createdAt).getTime() + duration).toISOString();
-}
-
-// Re-export for use in tests
-export { calculateExpiresAt };
 
 // Re-export ServiceError for backward compatibility
 export { ServiceError } from './errors.js';
@@ -205,6 +180,15 @@ export class MemoryService implements VectorIndexScheduler {
       this.embedding = null;
     }
 
+    // Initialize WAL recovery (must be before initPromise)
+    this.walRecovery = new WALRecovery({
+      wal: this.wal,
+      storage: this.storage,
+      vectorIndex: this.vectorIndex,
+      embedding: this.embedding,
+      logger: this.logger,
+    });
+
     // Set up init promise for WAL
     this.initPromise = this.wal.initialize().then(() => {
       return this.walRecovery.recover();
@@ -222,15 +206,6 @@ export class MemoryService implements VectorIndexScheduler {
       },
       this
     );
-
-    // Initialize WAL recovery
-    this.walRecovery = new WALRecovery({
-      wal: this.wal,
-      storage: this.storage,
-      vectorIndex: this.vectorIndex,
-      embedding: this.embedding,
-      logger: this.logger,
-    });
 
     // Initialize keyword searcher
     this.keywordSearcher = new KeywordSearcher({
@@ -341,8 +316,15 @@ export class MemoryService implements VectorIndexScheduler {
   async read(input: ReadMemoryInput): Promise<{ memory: Memory }> {
     try {
       const memory = await this.storage.read(input.id);
+
+      // Check if expired
+      if (isExpired(memory.expiresAt, new Date())) {
+        throw new ServiceError(`Memory not found: ${input.id}`, ErrorCode.NOT_FOUND);
+      }
+
       return { memory };
     } catch (error) {
+      if (error instanceof ServiceError) throw error;
       if (error instanceof StorageError && error.message.includes('not found')) {
         throw new ServiceError(`Memory not found: ${input.id}`, ErrorCode.NOT_FOUND);
       }
@@ -513,9 +495,18 @@ export class MemoryService implements VectorIndexScheduler {
           );
         }
 
+        // Handle TTL update - recalculate expiresAt if ttl is provided
+        let expiresAt = existing.expiresAt;
+        let ttl = existing.ttl;
+        if (input.ttl !== undefined) {
+          ttl = input.ttl;
+          expiresAt = calculateExpiresAt(input.ttl, now);
+        }
+
         const updatedMemory: Memory = {
           ...existing,
           updatedAt: now,
+          expiresAt,
           sessionId,
           entryType: input.entryType,
           ...(input.title !== undefined && { title: input.title }),
@@ -523,6 +514,7 @@ export class MemoryService implements VectorIndexScheduler {
           ...(input.tags !== undefined && { tags: input.tags }),
           ...(input.category !== undefined && { category: input.category }),
           ...(input.importance !== undefined && { importance: input.importance }),
+          ...(ttl !== undefined && { ttl }),
         };
 
         // WAL append first for durability
@@ -544,10 +536,13 @@ export class MemoryService implements VectorIndexScheduler {
         };
       } else {
         const id = randomUUID();
+        const expiresAt = input.ttl ? calculateExpiresAt(input.ttl, now) : undefined;
+
         const createdMemory: Memory = {
           id,
           createdAt: now,
           updatedAt: now,
+          expiresAt,
           sessionId,
           entryType: input.entryType,
           tags: input.tags ?? [],
@@ -555,6 +550,7 @@ export class MemoryService implements VectorIndexScheduler {
           importance: input.importance ?? 3,
           title: input.title ?? 'memory note',
           content: input.content,
+          ...(input.ttl !== undefined && { ttl: input.ttl }),
         };
 
         // WAL append first for durability
@@ -584,41 +580,4 @@ export class MemoryService implements VectorIndexScheduler {
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // Metadata helpers
-  // ---------------------------------------------------------------------------
-
-  async getCategories(): Promise<GetCategoriesOutput> {
-    try {
-      const listResult = await this.list({ limit: 1000 });
-      const categories = new Set<string>();
-      for (const memory of listResult.memories) {
-        categories.add(memory.category);
-      }
-      return { categories: Array.from(categories).sort() };
-    } catch (error) {
-      throw new ServiceError(
-        `Failed to get categories: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        ErrorCode.STORAGE_ERROR
-      );
-    }
-  }
-
-  async getTags(): Promise<GetTagsOutput> {
-    try {
-      const listResult = await this.list({ limit: 1000 });
-      const tags = new Set<string>();
-      for (const memory of listResult.memories) {
-        for (const tag of memory.tags) {
-          tags.add(tag);
-        }
-      }
-      return { tags: Array.from(tags).sort() };
-    } catch (error) {
-      throw new ServiceError(
-        `Failed to get tags: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        ErrorCode.STORAGE_ERROR
-      );
-    }
-  }
 }

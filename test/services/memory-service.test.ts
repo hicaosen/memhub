@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'fs';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { MemoryService, ServiceError } from '../../src/services/memory-service.js';
@@ -262,35 +262,203 @@ describe('MemoryService', () => {
     });
   });
 
-  describe('getCategories', () => {
-    it('should return all unique categories', async () => {
-      await memoryService.create({ title: '1', content: 'C', category: 'work' });
-      await memoryService.create({ title: '2', content: 'C', category: 'personal' });
-      await memoryService.create({ title: '3', content: 'C', category: 'work' });
-      const result = await memoryService.getCategories();
-      expect(result.categories).toContain('personal');
-      expect(result.categories).toContain('work');
+  describe('TTL functionality', () => {
+    it('should create memory with TTL and set expiresAt', async () => {
+      const input: CreateMemoryInput = {
+        title: 'Test TTL',
+        content: 'Content with TTL',
+        ttl: 'short',
+      };
+
+      const result = await memoryService.create(input);
+      expect(result.memory.ttl).toBe('short');
+      expect(result.memory.expiresAt).toBeDefined();
+      // short TTL is 7 days
+      const expectedExpiry = new Date(result.memory.createdAt).getTime() + 7 * 24 * 60 * 60 * 1000;
+      expect(new Date(result.memory.expiresAt!).getTime()).toBe(expectedExpiry);
     });
 
-    it('should return empty array when no memories exist', async () => {
-      const result = await memoryService.getCategories();
-      expect(result.categories).toEqual([]);
-    });
-  });
+    it('should create memory without TTL (no expiresAt)', async () => {
+      const input: CreateMemoryInput = {
+        title: 'Test No TTL',
+        content: 'Content without TTL',
+      };
 
-  describe('getTags', () => {
-    it('should return all unique tags', async () => {
-      await memoryService.create({ title: '1', content: 'C', tags: ['a', 'b'] });
-      await memoryService.create({ title: '2', content: 'C', tags: ['b', 'c'] });
-      const result = await memoryService.getTags();
-      expect(result.tags).toContain('a');
-      expect(result.tags).toContain('b');
-      expect(result.tags).toContain('c');
+      const result = await memoryService.create(input);
+      expect(result.memory.ttl).toBeUndefined();
+      expect(result.memory.expiresAt).toBeUndefined();
     });
 
-    it('should return empty array when no memories exist', async () => {
-      const result = await memoryService.getTags();
-      expect(result.tags).toEqual([]);
+    it('should create memory with permanent TTL (no expiresAt)', async () => {
+      const input: CreateMemoryInput = {
+        title: 'Permanent Memory',
+        content: 'This will never expire',
+        ttl: 'permanent',
+      };
+
+      const result = await memoryService.create(input);
+      expect(result.memory.ttl).toBe('permanent');
+      expect(result.memory.expiresAt).toBeUndefined();
+    });
+
+    it('should update memory with TTL and recalculate expiresAt', async () => {
+      const created = await memoryService.create({
+        title: 'Original',
+        content: 'Content',
+      });
+
+      const updated = await memoryService.update({
+        id: created.id,
+        ttl: 'session',
+      });
+
+      expect(updated.memory.ttl).toBe('session');
+      expect(updated.memory.expiresAt).toBeDefined();
+      // session TTL is 24 hours
+      const expectedExpiry = new Date(updated.memory.updatedAt).getTime() + 24 * 60 * 60 * 1000;
+      expect(new Date(updated.memory.expiresAt!).getTime()).toBe(expectedExpiry);
+    });
+
+    it('should not list expired memories', async () => {
+      // Create a memory file with expired expiresAt
+      const tempDir = mkdtempSync(join(tmpdir(), 'memhub-ttl-test-'));
+      const service = new MemoryService({
+        storagePath: tempDir,
+        vectorSearch: false,
+        llmAssistantMode: 'disabled',
+        rerankerMode: 'lightweight',
+      });
+
+      // Create a valid memory first
+      const valid = await service.create({
+        title: 'Valid Memory',
+        content: 'This is valid',
+      });
+
+      // Create an expired memory by writing directly to storage
+      const expiredContent = `---
+id: 550e8400-e29b-41d4-a716-446655440001
+created_at: 2024-01-01T00:00:00.000Z
+updated_at: 2024-01-01T00:00:00.000Z
+expires_at: 2024-01-02T00:00:00.000Z
+tags: []
+category: general
+importance: 3
+---
+# Expired Memory
+This memory has expired.`;
+
+      writeFileSync(join(tempDir, 'expired-memory.md'), expiredContent, 'utf-8');
+
+      // List should only return the valid memory
+      const result = await service.list({});
+      expect(result.memories).toHaveLength(1);
+      expect(result.memories[0].id).toBe(valid.id);
+
+      rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    it('should return NOT_FOUND when reading expired memory', async () => {
+      // Create a memory file with expired expiresAt
+      const tempDir = mkdtempSync(join(tmpdir(), 'memhub-ttl-read-test-'));
+      const service = new MemoryService({
+        storagePath: tempDir,
+        vectorSearch: false,
+        llmAssistantMode: 'disabled',
+        rerankerMode: 'lightweight',
+      });
+
+      // Create an expired memory by writing directly to storage
+      const expiredId = '550e8400-e29b-41d4-a716-446655440002';
+      const expiredContent = `---
+id: ${expiredId}
+created_at: 2024-01-01T00:00:00.000Z
+updated_at: 2024-01-01T00:00:00.000Z
+expires_at: 2024-01-02T00:00:00.000Z
+tags: []
+category: general
+importance: 3
+---
+# Expired Memory
+This memory has expired.`;
+
+      writeFileSync(join(tempDir, 'expired-memory.md'), expiredContent, 'utf-8');
+
+      // Reading expired memory should throw NOT_FOUND
+      await expect(service.read({ id: expiredId })).rejects.toThrow(ServiceError);
+
+      rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    it('should not return expired memories in search', async () => {
+      // Create a memory file with expired expiresAt
+      const tempDir = mkdtempSync(join(tmpdir(), 'memhub-ttl-search-test-'));
+      const service = new MemoryService({
+        storagePath: tempDir,
+        vectorSearch: false,
+        llmAssistantMode: 'disabled',
+        rerankerMode: 'lightweight',
+      });
+
+      // Create a valid memory
+      await service.create({
+        title: 'Valid Project',
+        content: 'This is a valid project memory',
+      });
+
+      // Create an expired memory with searchable content
+      const expiredContent = `---
+id: 550e8400-e29b-41d4-a716-446655440003
+created_at: 2024-01-01T00:00:00.000Z
+updated_at: 2024-01-01T00:00:00.000Z
+expires_at: 2024-01-02T00:00:00.000Z
+tags: []
+category: general
+importance: 3
+---
+# Expired Project
+This expired project memory should not appear in search.`;
+
+      writeFileSync(join(tempDir, 'expired-project.md'), expiredContent, 'utf-8');
+
+      // Search should only return the valid memory
+      const result = await service.search({ query: 'project' });
+      expect(result.results.length).toBeGreaterThanOrEqual(1);
+      // All results should be valid (not expired)
+      for (const r of result.results) {
+        expect(r.memory.id).not.toBe('550e8400-e29b-41d4-a716-446655440003');
+      }
+
+      rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    it('should support memoryUpdate with TTL on create', async () => {
+      const result = await memoryService.memoryUpdate({
+        content: 'New memory with TTL',
+        ttl: 'medium',
+        title: 'TTL Test',
+      });
+
+      expect(result.created).toBe(true);
+      expect(result.memory.ttl).toBe('medium');
+      expect(result.memory.expiresAt).toBeDefined();
+    });
+
+    it('should support memoryUpdate with TTL on update', async () => {
+      const created = await memoryService.memoryUpdate({
+        content: 'Original content',
+        title: 'Original',
+      });
+
+      const updated = await memoryService.memoryUpdate({
+        id: created.id,
+        content: 'Updated content',
+        ttl: 'short',
+      });
+
+      expect(updated.updated).toBe(true);
+      expect(updated.memory.ttl).toBe('short');
+      expect(updated.memory.expiresAt).toBeDefined();
     });
   });
 });

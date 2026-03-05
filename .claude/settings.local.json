@@ -13,7 +13,8 @@
       "WebSearch",
       "mcp__zread__get_repo_structure",
       "Bash(sed:*)",
-      "Bash(npx vitest:*)"
+      "Bash(npx vitest:*)",
+      "Bash(gh issue:*)"
     ]
   }
 }

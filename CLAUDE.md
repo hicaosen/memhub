@@ -1,3 +1,44 @@
+<!-- MEMHUB:v0.2.3:START -->
+## MemHub - AI Memory System
+
+MemHub is a Git-friendly memory system for storing decisions, preferences, and reusable knowledge.
+
+### When to Call memory_load
+
+**Proactively call** memory_load in these scenarios:
+
+- Starting a new conversation or task
+- User mentions "before", "remember", "last time" keywords
+- Uncertain about user preferences or constraints
+- Need project context (tech stack, conventions, architecture)
+
+### When to Call memory_update
+
+**Proactively store** memories in these scenarios:
+
+- User explicitly expresses a preference ("I prefer functional components")
+- User makes a decision with reasoning ("Using PostgreSQL because...")
+- Discover important project context (tech stack, constraints, patterns)
+- User corrects your assumptions ("Actually, we don't use Redux")
+
+### Usage Principles
+
+1. **Load on demand** - Call memory_load at task start to get context
+2. **Store timely** - Call memory_update when learning valuable information
+3. **Query precisely** - Use tags to filter relevant memories
+4. **Describe concisely** - Be specific in content, helpful in title
+
+### Memory Types
+
+| entryType | Purpose |
+|-----------|---------|
+| preference | User preferences (coding style, framework choices) |
+| decision | Architecture decisions, technology choices |
+| context | Project context (team, processes, constraints) |
+| fact | Learned facts, important notes |
+
+<!-- MEMHUB:END -->
+
 # AGENTS.md - MemHub Project Guide
 
 ## Project Overview
@@ -91,13 +132,15 @@ export const MemorySchema = z.object({
 
 ### Add New MCP Tool
 
-1. **Define types** → `src/contracts/types.ts`
-2. **Define schema** → `src/contracts/schemas.ts`
+1. **Define schema** → `src/contracts/schemas.ts` (Zod schema + inferred type export)
+2. **Re-export type** → `src/contracts/types.ts` (add to re-export list)
 3. **Register tool** → `src/contracts/mcp.ts`
 4. **Implement logic** → `src/services/memory-service.ts`
 5. **Add tests** → `test/services/memory-service.test.ts`
 6. **Update docs** → `docs/mcp-tools.md`
 7. **Run quality gate** → `npx pnpm run quality`
+
+**Type Pattern:** Define Zod schema → `export type X = z.infer<typeof XSchema>` in schemas.ts → re-export in types.ts
 
 ### Support New Agent
 

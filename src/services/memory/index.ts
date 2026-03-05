@@ -17,3 +17,5 @@ export type {
 
 export { WALRecovery } from './wal-recovery.js';
 export type { WALRecoveryContext } from './wal-recovery.js';
+
+export { TTL_DURATIONS, calculateExpiresAt, isExpired } from './ttl-utils.js';

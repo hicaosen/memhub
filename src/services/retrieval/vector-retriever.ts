@@ -1,5 +1,6 @@
 import type { Memory } from '../../contracts/types.js';
 import type { VectorHit, VectorRetriever } from './types.js';
+import { isExpired } from '../memory/ttl-utils.js';
 
 interface EmbeddingLike {
   embed(text: string): Promise<number[]>;
@@ -30,6 +31,7 @@ export class VectorRetrieverAdapter implements VectorRetriever {
     tags?: readonly string[];
   }): Promise<readonly VectorHit[]> {
     const dedup = new Map<string, VectorHit>();
+    const now = new Date();
 
     for (const variant of input.variants.slice(0, 3)) {
       const vector = await this.deps.embedding.embed(variant);
@@ -37,6 +39,8 @@ export class VectorRetrieverAdapter implements VectorRetriever {
       for (const item of results) {
         const memory = await this.deps.readMemoryById(item.id);
         if (!memory) continue;
+        // Skip expired memories
+        if (isExpired(memory.expiresAt, now)) continue;
         if (input.category && memory.category !== input.category) continue;
         if (
           input.tags &&

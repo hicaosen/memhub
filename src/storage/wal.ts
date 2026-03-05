@@ -102,8 +102,9 @@ export class WALStorage {
       }
     }
 
-    // Rewrite the entire WAL with updated indexed status
-    await this.rewrite(entries);
+    // Only keep unindexed entries, cleaning up completed records
+    const unindexed = entries.filter(e => !e.indexed);
+    await this.rewrite(unindexed);
   }
 
   /**

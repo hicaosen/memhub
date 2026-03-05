@@ -13,9 +13,11 @@ import type {
 import { ErrorCode } from '../../contracts/types.js';
 import { ServiceError } from '../errors.js';
 import { MarkdownStorage, StorageError } from '../../storage/markdown-storage.js';
+import { parseFrontMatter, frontMatterToMemory } from '../../storage/frontmatter-parser.js';
 import type { WALStorage } from '../../storage/wal.js';
 import type { Logger } from '../../utils/logger.js';
 import lockfile from 'proper-lockfile';
+import { calculateExpiresAt, isExpired } from './ttl-utils.js';
 
 const LOCK_TIMEOUT = 5000; // 5 seconds
 
@@ -82,19 +84,23 @@ export class MemoryRepository {
     const now = new Date().toISOString();
     const id = randomUUID();
 
+    const expiresAt = input.ttl ? calculateExpiresAt(input.ttl, now) : undefined;
+
     const memory: Memory = {
       id,
       createdAt: now,
       updatedAt: now,
+      expiresAt,
       tags: input.tags ?? [],
       category: input.category ?? 'general',
       importance: input.importance ?? 3,
       title: input.title,
       content: input.content,
+      ...(input.ttl && { ttl: input.ttl }),
     };
 
-    // WAL append first for durability
-    const walOffset = await this.context.wal.append('create', id);
+    // WAL append first for durability (include memory data for crash recovery)
+    const walOffset = await this.context.wal.append('create', id, JSON.stringify(memory));
 
     // Persist to disk
     const filePath = await this.context.storage.write(memory);
@@ -108,8 +114,15 @@ export class MemoryRepository {
   async read(input: ReadMemoryInput): Promise<{ memory: Memory }> {
     try {
       const memory = await this.context.storage.read(input.id);
+
+      // Check if expired
+      if (isExpired(memory.expiresAt, new Date())) {
+        throw new ServiceError(`Memory not found: ${input.id}`, ErrorCode.NOT_FOUND);
+      }
+
       return { memory };
     } catch (error) {
+      if (error instanceof ServiceError) throw error;
       if (error instanceof StorageError && error.message.includes('not found')) {
         throw new ServiceError(`Memory not found: ${input.id}`, ErrorCode.NOT_FOUND);
       }
@@ -139,18 +152,30 @@ export class MemoryRepository {
       );
     }
 
+    const now = new Date().toISOString();
+
+    // Handle TTL update - recalculate expiresAt if ttl is provided
+    let expiresAt = existing.expiresAt;
+    let ttl = existing.ttl;
+    if (input.ttl !== undefined) {
+      ttl = input.ttl;
+      expiresAt = calculateExpiresAt(input.ttl, now);
+    }
+
     const updated: Memory = {
       ...existing,
-      updatedAt: new Date().toISOString(),
+      updatedAt: now,
+      expiresAt,
       ...(input.title !== undefined && { title: input.title }),
       ...(input.content !== undefined && { content: input.content }),
       ...(input.tags !== undefined && { tags: input.tags }),
       ...(input.category !== undefined && { category: input.category }),
       ...(input.importance !== undefined && { importance: input.importance }),
+      ...(ttl !== undefined && { ttl }),
     };
 
-    // WAL append first for durability
-    const walOffset = await this.context.wal.append('update', updated.id);
+    // WAL append first for durability (include memory data for crash recovery)
+    const walOffset = await this.context.wal.append('update', updated.id, JSON.stringify(updated));
 
     // Persist to disk
     await this.context.storage.write(updated);
@@ -186,13 +211,16 @@ export class MemoryRepository {
   async list(input: ListMemoryInput): Promise<ListResult> {
     try {
       const files = await this.context.storage.list();
+      const now = new Date();
 
       let memories: Memory[] = [];
       for (const file of files) {
         try {
-          const memory = await this.context.storage.read(
-            this.extractIdFromContent(file.content)
-          );
+          // Parse directly from file content - O(n) instead of O(n²)
+          const { frontMatter, title, content } = parseFrontMatter(file.content);
+          const memory = frontMatterToMemory(frontMatter, title, content);
+          // Skip expired memories
+          if (isExpired(memory.expiresAt, now)) continue;
           memories.push(memory);
         } catch {
           continue;
@@ -273,16 +301,5 @@ export class MemoryRepository {
     if (this.context.initPromise) {
       await this.context.initPromise;
     }
-  }
-
-  /**
-   * Extracts memory ID from content
-   */
-  private extractIdFromContent(content: string): string {
-    const match = content.match(/id:\s*"?([^"\n]+)"?/);
-    if (!match) {
-      throw new Error('Could not extract ID from content');
-    }
-    return match[1].trim();
   }
 }
