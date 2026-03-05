@@ -5,7 +5,7 @@
  */
 
 /** Types of models used in MemHub */
-export type ModelKind = 'llm' | 'embedding' | 'reranker';
+export type ModelKind = 'embedding' | 'reranker';
 
 /** Configuration for a single model */
 export interface ModelConfig {
@@ -26,20 +26,12 @@ export interface ModelConfig {
 /** All models required by MemHub */
 export const MODELS: readonly ModelConfig[] = [
   {
-    kind: 'llm',
-    name: 'qwen2.5-1.5b-instruct',
-    filename: 'qwen2.5-1.5b-instruct-q4_k_m.gguf',
-    hfRepo: 'Qwen/Qwen2.5-1.5B-Instruct-GGUF',
-    hfFile: 'qwen2.5-1.5b-instruct-q4_k_m.gguf',
-    sizeBytes: 1_100_000_000, // ~1.1GB
-  },
-  {
     kind: 'embedding',
-    name: 'nomic-embed-text-v1.5',
-    filename: 'nomic-embed-text-v1.5.Q4_K_M.gguf',
-    hfRepo: 'nomic-ai/nomic-embed-text-v1.5-GGUF',
-    hfFile: 'nomic-embed-text-v1.5.Q4_K_M.gguf',
-    sizeBytes: 140_000_000, // ~140MB
+    name: 'nomic-embed-text-v2-moe',
+    filename: 'nomic-embed-text-v2-moe.Q4_K_M.gguf',
+    hfRepo: 'nomic-ai/nomic-embed-text-v2-moe-GGUF',
+    hfFile: 'nomic-embed-text-v2-moe.Q4_K_M.gguf',
+    sizeBytes: 328_000_000, // ~328MB
   },
   {
     kind: 'reranker',

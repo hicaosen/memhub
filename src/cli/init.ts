@@ -6,6 +6,7 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { homedir } from 'os';
+import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { AGENTS, type AgentType, type AgentConfig, getAgentById } from './types.js';
 import { getConfigGenerator } from './agents/index.js';
 import { updateInstructionsContent } from './instructions.js';
@@ -34,122 +35,6 @@ export interface InitError {
 
 export type InitOutcome = InitResult | InitError;
 
-function parseTomlValue(rawValue: string): unknown {
-  const value = rawValue.trim();
-
-  if (value.startsWith('"') && value.endsWith('"')) {
-    return value.slice(1, -1).replace(/\\"/g, '"');
-  }
-
-  if (value.startsWith('[') && value.endsWith(']')) {
-    const items: string[] = [];
-    const matcher = /"((?:\\.|[^"])*)"/g;
-    let match: RegExpExecArray | null;
-    while ((match = matcher.exec(value)) !== null) {
-      items.push(match[1].replace(/\\"/g, '"'));
-    }
-    return items;
-  }
-
-  if (value === 'true') return true;
-  if (value === 'false') return false;
-
-  const numberValue = Number(value);
-  if (!Number.isNaN(numberValue)) return numberValue;
-
-  return value;
-}
-
-function parseTomlFallback(content: string): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  let currentSection: Record<string, unknown> = result;
-
-  for (const rawLine of content.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith('#')) continue;
-
-    if (line.startsWith('[') && line.endsWith(']')) {
-      const path = line.slice(1, -1).split('.').map(segment => segment.trim());
-      currentSection = result;
-
-      for (const key of path) {
-        const existing = currentSection[key];
-        if (!isRecord(existing)) {
-          currentSection[key] = {};
-        }
-        currentSection = currentSection[key] as Record<string, unknown>;
-      }
-      continue;
-    }
-
-    const equalsIndex = line.indexOf('=');
-    if (equalsIndex === -1) continue;
-
-    const key = line.slice(0, equalsIndex).trim();
-    const value = line.slice(equalsIndex + 1).trim();
-    currentSection[key] = parseTomlValue(value);
-  }
-
-  return result;
-}
-
-function formatTomlValue(value: unknown): string {
-  if (typeof value === 'string') {
-    return `"${value.replace(/"/g, '\\"')}"`;
-  }
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
-  }
-  if (Array.isArray(value)) {
-    const items = value.map(item => formatTomlValue(String(item)));
-    return `[${items.join(', ')}]`;
-  }
-  return `"${String(value).replace(/"/g, '\\"')}"`;
-}
-
-function stringifyTomlFallback(config: Record<string, unknown>): string {
-  const rootValues: Array<[string, unknown]> = [];
-  const sections: Array<{ path: string; values: Array<[string, unknown]> }> = [];
-
-  const visit = (node: Record<string, unknown>, path: string[]): void => {
-    const values: Array<[string, unknown]> = [];
-
-    for (const [key, value] of Object.entries(node)) {
-      if (isRecord(value)) continue;
-      values.push([key, value]);
-    }
-
-    if (path.length === 0) {
-      rootValues.push(...values);
-    } else if (values.length > 0) {
-      sections.push({ path: path.join('.'), values });
-    }
-
-    for (const [key, value] of Object.entries(node)) {
-      if (isRecord(value)) {
-        visit(value, [...path, key]);
-      }
-    }
-  };
-
-  visit(config, []);
-
-  const lines: string[] = [];
-  for (const [key, value] of rootValues) {
-    lines.push(`${key} = ${formatTomlValue(value)}`);
-  }
-
-  for (const section of sections) {
-    if (lines.length > 0) lines.push('');
-    lines.push(`[${section.path}]`);
-    for (const [key, value] of section.values) {
-      lines.push(`${key} = ${formatTomlValue(value)}`);
-    }
-  }
-
-  return lines.join('\n');
-}
-
 /**
  * Parse config file content based on format
  */
@@ -158,7 +43,11 @@ function parseConfig(
   format: 'json' | 'markdown' | 'toml'
 ): Record<string, unknown> {
   if (format === 'toml') {
-    return parseTomlFallback(content);
+    const parsed = parseToml(content);
+    if (!isRecord(parsed)) {
+      throw new Error('TOML config root must be an object');
+    }
+    return parsed;
   }
   return JSON.parse(content) as Record<string, unknown>;
 }
@@ -171,7 +60,7 @@ function stringifyConfig(
   format: 'json' | 'markdown' | 'toml'
 ): string {
   if (format === 'toml') {
-    return stringifyTomlFallback(config);
+    return stringifyToml(config);
   }
   return JSON.stringify(config, null, 2);
 }

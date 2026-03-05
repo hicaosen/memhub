@@ -44,7 +44,7 @@ describe('model-path-resolver', () => {
 
   describe('resolveModelPath', () => {
     it('resolves model path correctly', () => {
-      const model = getModelByKind('llm')!;
+      const model = getModelByKind('embedding')!;
       mockExistsSync.mockReturnValue(false);
 
       const result = resolveModelPath(model);
@@ -105,7 +105,7 @@ describe('model-path-resolver', () => {
 
       const missing = await getMissingModels();
 
-      expect(missing).toHaveLength(3);
+      expect(missing).toHaveLength(2);
     });
 
     it('returns empty array when all are downloaded', async () => {
@@ -119,15 +119,15 @@ describe('model-path-resolver', () => {
 
     it('returns only missing models', async () => {
       mockExistsSync.mockImplementation((path: string) => {
-        // Only LLM model exists
-        return path.includes('qwen2');
+        // Only embedding model exists
+        return path.includes('nomic-embed-text-v2-moe');
       });
       mockStatSync.mockReturnValue({ size: 1000000 });
 
       const missing = await getMissingModels();
 
-      expect(missing).toHaveLength(2);
-      expect(missing.map(m => m.kind)).toEqual(expect.arrayContaining(['embedding', 'reranker']));
+      expect(missing).toHaveLength(1);
+      expect(missing.map(m => m.kind)).toEqual(['reranker']);
     });
   });
 
@@ -137,9 +137,9 @@ describe('model-path-resolver', () => {
 
       const status = await getDownloadStatus();
 
-      expect(status.total).toBe(3);
+      expect(status.total).toBe(2);
       expect(status.downloaded).toBe(0);
-      expect(status.missing).toBe(3);
+      expect(status.missing).toBe(2);
     });
 
     it('returns correct status when all downloaded', async () => {
@@ -148,8 +148,8 @@ describe('model-path-resolver', () => {
 
       const status = await getDownloadStatus();
 
-      expect(status.total).toBe(3);
-      expect(status.downloaded).toBe(3);
+      expect(status.total).toBe(2);
+      expect(status.downloaded).toBe(2);
       expect(status.missing).toBe(0);
     });
   });

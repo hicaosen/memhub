@@ -10,21 +10,14 @@ import {
 
 describe('model-manager types', () => {
   describe('MODELS', () => {
-    it('contains 3 models', () => {
-      expect(MODELS).toHaveLength(3);
-    });
-
-    it('has LLM model', () => {
-      const llm = MODELS.find(m => m.kind === 'llm');
-      expect(llm).toBeDefined();
-      expect(llm?.name).toBe('qwen2.5-1.5b-instruct');
-      expect(llm?.filename).toBe('qwen2.5-1.5b-instruct-q4_k_m.gguf');
+    it('contains 2 models', () => {
+      expect(MODELS).toHaveLength(2);
     });
 
     it('has embedding model', () => {
       const embedding = MODELS.find(m => m.kind === 'embedding');
       expect(embedding).toBeDefined();
-      expect(embedding?.name).toBe('nomic-embed-text-v1.5');
+      expect(embedding?.name).toBe('nomic-embed-text-v2-moe');
     });
 
     it('has reranker model', () => {
@@ -46,11 +39,6 @@ describe('model-manager types', () => {
   });
 
   describe('getModelByKind', () => {
-    it('returns LLM model', () => {
-      const model = getModelByKind('llm');
-      expect(model?.kind).toBe('llm');
-    });
-
     it('returns embedding model', () => {
       const model = getModelByKind('embedding');
       expect(model?.kind).toBe('embedding');
@@ -69,7 +57,7 @@ describe('model-manager types', () => {
 
   describe('getModelByName', () => {
     it('returns model by name', () => {
-      const model = getModelByName('nomic-embed-text-v1.5');
+      const model = getModelByName('nomic-embed-text-v2-moe');
       expect(model?.kind).toBe('embedding');
     });
 
@@ -103,7 +91,7 @@ describe('model-manager types', () => {
 
     it('formats gigabytes', () => {
       expect(formatBytes(1024 * 1024 * 1024)).toBe('1.0 GB');
-      expect(formatBytes(1.1 * 1024 * 1024 * 1024)).toBe('1.1 GB');
+      expect(formatBytes(1.2 * 1024 * 1024 * 1024)).toBe('1.2 GB');
     });
   });
 });

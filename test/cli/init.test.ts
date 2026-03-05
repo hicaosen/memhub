@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
+import { parse as parseToml } from 'smol-toml';
 import { initAgent } from '../../src/cli/init.js';
 import { AGENTS, type AgentType } from '../../src/cli/types.js';
 import {
@@ -221,7 +222,47 @@ describe('CLI Init Command', () => {
 
       expect(content).toContain('[mcp_servers.memhub]');
       expect(content).toContain('command = "npx"');
-      expect(content).toContain('"@synth-coder/memhub@latest"');
+      const parsed = parseToml(content) as {
+        readonly mcp_servers?: {
+          readonly memhub?: {
+            readonly args?: readonly string[];
+          };
+        };
+      };
+      expect(parsed.mcp_servers?.memhub?.args).toEqual(['-y', '@synth-coder/memhub@latest']);
+    });
+
+    it('should merge codex TOML without breaking array values', () => {
+      const configPath = join(TEST_DIR, '.codex/config.toml');
+      mkdirSync(join(TEST_DIR, '.codex'), { recursive: true });
+      writeFileSync(
+        configPath,
+        `[mcp_servers.docs]
+command = "npx"
+args = ["-y", "@openai/docs-mcp"]
+`,
+        'utf-8'
+      );
+
+      const result = initAgent({
+        agent: 'codex',
+        local: true,
+        projectPath: TEST_DIR,
+      });
+
+      expect(result.success).toBe(true);
+      const merged = readFileSync(configPath, 'utf-8');
+      const parsed = parseToml(merged) as {
+        readonly mcp_servers?: Record<
+          string,
+          {
+            readonly args?: readonly string[];
+          }
+        >;
+      };
+
+      expect(parsed.mcp_servers?.docs?.args).toEqual(['-y', '@openai/docs-mcp']);
+      expect(parsed.mcp_servers?.memhub?.args).toEqual(['-y', '@synth-coder/memhub@latest']);
     });
 
     it('should generate instructions with version tag', () => {

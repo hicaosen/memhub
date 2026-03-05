@@ -1,7 +1,7 @@
 /**
  * Embedding Service - Text embedding using node-llama-cpp
  *
- * Uses the nomic-embed-text-v1.5 GGUF model (~140MB, stored in ~/.memhub/models/).
+ * Uses the nomic-embed-text-v2-moe GGUF model (~328MB, stored in ~/.memhub/models/).
  * Singleton pattern with lazy initialization.
  *
  * Note: Uses dynamic imports to avoid loading native modules during tests.
@@ -13,7 +13,7 @@ import { createLogger, type Logger } from '../utils/logger.js';
 /** Model kind for embedding */
 const MODEL_KIND = 'embedding' as const;
 
-/** Output vector dimension for nomic-embed-text-v1.5 */
+/** Output vector dimension for nomic-embed-text-v2-moe */
 export const VECTOR_DIM = 768;
 
 // Lazy-initialized logger
@@ -27,7 +27,7 @@ function getLogger(): Logger {
 
 /**
  * Singleton embedding service backed by a local GGUF model.
- * The model file is stored in `~/.memhub/models/nomic-embed-text-v1.5/`.
+ * The model file is stored in `~/.memhub/models/nomic-embed-text-v2-moe/`.
  */
 export class EmbeddingService {
   private static instance: EmbeddingService | null = null;
