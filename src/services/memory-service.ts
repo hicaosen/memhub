@@ -1,7 +1,5 @@
 import { randomUUID } from 'crypto';
-import { createHash } from 'crypto';
-import { readFile, writeFile, mkdir, rename } from 'fs/promises';
-import { dirname, join } from 'path';
+import { join } from 'path';
 import type {
   Memory,
   CreateMemoryInput,
@@ -17,8 +15,6 @@ import type {
   SearchResult,
   GetCategoriesOutput,
   GetTagsOutput,
-  SortField,
-  SortOrder,
   MemoryLoadInput,
   MemoryUpdateInput,
   MemoryLoadOutput,
@@ -27,15 +23,20 @@ import type {
 } from '../contracts/types.js';
 import { ErrorCode } from '../contracts/types.js';
 import { MarkdownStorage, StorageError } from '../storage/markdown-storage.js';
-import { WALStorage, createWALStorage } from '../storage/wal.js';
-import lockfile from 'proper-lockfile';
+import { createWALStorage } from '../storage/wal.js';
 import { RetrievalPipeline } from './retrieval/pipeline.js';
 import type { VectorRetriever } from './retrieval/types.js';
 import { VectorRetrieverAdapter } from './retrieval/vector-retriever.js';
 import { createReranker, type RerankerMode } from './retrieval/reranker.js';
 import { createLogger, type Logger } from '../utils/logger.js';
-
-const LOCK_TIMEOUT = 5000; // 5 seconds
+import { ServiceError } from './errors.js';
+import {
+  FileIdempotencyStore,
+  KeywordSearcher,
+  MemoryRepository,
+  WALRecovery,
+  type VectorIndexScheduler,
+} from './memory/index.js';
 
 /** TTL durations in milliseconds */
 const TTL_DURATIONS: Record<TTLLevel, number | null> = {
@@ -61,6 +62,9 @@ function calculateExpiresAt(ttl: TTLLevel, createdAt: string): string | undefine
 // Re-export for use in tests
 export { calculateExpiresAt };
 
+// Re-export ServiceError for backward compatibility
+export { ServiceError } from './errors.js';
+
 /** Minimal interface required from VectorIndex (avoids static import of native module) */
 interface IVectorIndex {
   upsert(memory: Memory, vector: number[], walOffset: number): Promise<void>;
@@ -72,20 +76,6 @@ interface IVectorIndex {
 interface IEmbeddingService {
   embedMemory(title: string, content: string): Promise<number[]>;
   embed(text: string): Promise<number[]>;
-}
-
-/**
- * Custom error for service operations
- */
-export class ServiceError extends Error {
-  constructor(
-    message: string,
-    public readonly code: ErrorCode,
-    public readonly data?: Record<string, unknown>
-  ) {
-    super(message);
-    this.name = 'ServiceError';
-  }
 }
 
 /**
@@ -125,45 +115,46 @@ export interface MemoryServiceConfig {
   llmAssistantThreads?: number;
 }
 
-interface MemoryUpdateIdempotencyRecord {
-  readonly fingerprint: string;
-  readonly recordedAt: string;
-  readonly result: MemoryUpdateOutput;
-}
-
 /**
- * Memory service implementation
+ * Memory service implementation - coordinator for memory operations
  */
-export class MemoryService {
+export class MemoryService implements VectorIndexScheduler {
   private readonly storagePath: string;
   private readonly storage: MarkdownStorage;
-  private readonly wal: WALStorage;
+  private readonly wal: ReturnType<typeof createWALStorage>;
   private readonly vectorIndex: IVectorIndex | null;
   private readonly embedding: IEmbeddingService | null;
   private readonly vectorSearchEnabled: boolean;
   private readonly retrievalPipeline: RetrievalPipeline;
-  private readonly idempotencyFilePath: string;
   private readonly logger: Logger;
+
+  // Extracted components
+  private readonly repository: MemoryRepository;
+  private readonly idempotencyStore: FileIdempotencyStore;
+  private readonly keywordSearcher: KeywordSearcher;
+  private readonly walRecovery: WALRecovery;
+
   // eslint-disable-next-line @typescript-eslint/prefer-readonly
   private initPromise: Promise<void> | null = null;
 
   constructor(config: MemoryServiceConfig) {
     this.storagePath = config.storagePath;
     this.logger = createLogger({ role: 'daemon' });
-    this.idempotencyFilePath = join(
-      config.storagePath,
-      '.memhub-idempotency',
-      'memory-update-index.json'
-    );
+
     this.storage = new MarkdownStorage({ storagePath: config.storagePath });
     this.wal = createWALStorage(config.storagePath);
     this.vectorSearchEnabled = config.vectorSearch !== false;
 
-    // Initialize WAL
-    this.initPromise = this.wal.initialize().then(() => {
-      // Run recovery for unindexed entries
-      return this.recoverFromWAL();
-    });
+    // Initialize idempotency store
+    const idempotencyFilePath = join(
+      config.storagePath,
+      '.memhub-idempotency',
+      'memory-update-index.json'
+    );
+    this.idempotencyStore = new FileIdempotencyStore(idempotencyFilePath);
+
+    // Placeholder init promise - will be set below
+    let initPromiseRef: Promise<void> | null = null;
 
     if (this.vectorSearchEnabled) {
       // Lazily resolved at runtime — do not use top-level static imports so that
@@ -172,11 +163,9 @@ export class MemoryService {
       let resolvedEmbedding: IEmbeddingService | null = null;
 
       // Kick off async initialisation without blocking the constructor.
-      // The proxy objects below delegate to the real instances once ready.
       const storagePath = config.storagePath;
-      const initPromise = this.initPromise;
       const vectorInitPromise = (async () => {
-        await initPromise;
+        await initPromiseRef!;
         const [{ VectorIndex }, { EmbeddingService }] = await Promise.all([
           import('../storage/vector-index.js'),
           import('./embedding-service.js'),
@@ -216,6 +205,39 @@ export class MemoryService {
       this.embedding = null;
     }
 
+    // Set up init promise for WAL
+    this.initPromise = this.wal.initialize().then(() => {
+      return this.walRecovery.recover();
+    });
+    initPromiseRef = this.initPromise;
+
+    // Initialize repository with vector scheduler
+    this.repository = new MemoryRepository(
+      {
+        storage: this.storage,
+        wal: this.wal,
+        storagePath: this.storagePath,
+        initPromise: this.initPromise,
+        logger: this.logger,
+      },
+      this
+    );
+
+    // Initialize WAL recovery
+    this.walRecovery = new WALRecovery({
+      wal: this.wal,
+      storage: this.storage,
+      vectorIndex: this.vectorIndex,
+      embedding: this.embedding,
+      logger: this.logger,
+    });
+
+    // Initialize keyword searcher
+    this.keywordSearcher = new KeywordSearcher({
+      list: input => this.list(input),
+    });
+
+    // Initialize retrieval pipeline
     const vectorRetriever: VectorRetriever | undefined =
       this.vectorSearchEnabled && this.vectorIndex && this.embedding
         ? new VectorRetrieverAdapter({
@@ -249,7 +271,7 @@ export class MemoryService {
   }
 
   // ---------------------------------------------------------------------------
-  // Internal helpers
+  // VectorIndexScheduler implementation
   // ---------------------------------------------------------------------------
 
   /**
@@ -257,7 +279,7 @@ export class MemoryService {
    * After successful upsert, marks the WAL entry as indexed.
    * Fire-and-forget: failures are logged but do not propagate.
    */
-  private scheduleVectorUpsert(memory: Memory, walOffset: number): void {
+  scheduleUpsert(memory: Memory, walOffset: number): void {
     if (!this.vectorIndex || !this.embedding) return;
 
     const vectorIndex = this.vectorIndex;
@@ -269,7 +291,7 @@ export class MemoryService {
       .embedMemory(memory.title, memory.content)
       .then(vec => vectorIndex.upsert(memory, vec, walOffset))
       .then(() => wal.markIndexed(walOffset))
-      .catch(_err => {
+      .catch(() => {
         // Non-fatal: Markdown file is the source of truth
         void this.logger.error('vector_upsert_failed', 'Vector upsert failed (non-fatal)');
       });
@@ -279,48 +301,13 @@ export class MemoryService {
    * Removes a memory from the vector index.
    * Called synchronously (awaited) on delete.
    */
-  private async removeFromVectorIndex(id: string): Promise<void> {
+  async removeFromIndex(id: string): Promise<void> {
     if (!this.vectorIndex) return;
     try {
       await this.vectorIndex.delete(id);
-    } catch (_err) {
+    } catch {
       void this.logger.error('vector_delete_failed', 'Vector delete failed (non-fatal)');
     }
-  }
-
-  /**
-   * Recovers from WAL by replaying unindexed entries.
-   * Called during initialization to ensure crash recovery.
-   */
-  private async recoverFromWAL(): Promise<void> {
-    const unindexed = await this.wal.getUnindexed();
-    if (unindexed.length === 0) return;
-
-    void this.logger.info('wal_recovery_start', `Recovering ${unindexed.length} unindexed WAL entries`);
-
-    for (const entry of unindexed) {
-      try {
-        // Skip deleted entries - they don't need indexing
-        if (entry.operation === 'delete') {
-          await this.wal.markIndexed(entry.offset);
-          continue;
-        }
-
-        // Read the memory from disk and re-index
-        const memory = await this.storage.read(entry.memoryId);
-        if (this.vectorIndex && this.embedding) {
-          const vec = await this.embedding.embedMemory(memory.title, memory.content);
-          await this.vectorIndex.upsert(memory, vec, entry.offset);
-          await this.wal.markIndexed(entry.offset);
-        }
-      } catch (_err) {
-        // Memory may have been deleted, or indexing failed - mark as indexed to skip next time
-        void this.logger.warn('wal_recovery_entry_failed', `Failed to recover WAL entry ${entry.offset}`);
-        await this.wal.markIndexed(entry.offset);
-      }
-    }
-
-    void this.logger.info('wal_recovery_complete', 'WAL recovery complete');
   }
 
   // ---------------------------------------------------------------------------
@@ -331,49 +318,21 @@ export class MemoryService {
    * Creates a new memory entry
    */
   async create(input: CreateMemoryInput): Promise<CreateResult> {
-    const release = await lockfile.lock(this.storagePath, {
-      retries: { retries: 100, minTimeout: 50, maxTimeout: LOCK_TIMEOUT / 100 },
-    });
-    try {
-      const now = new Date().toISOString();
-      const id = randomUUID();
-
-      const memory: Memory = {
-        id,
-        createdAt: now,
-        updatedAt: now,
-        tags: input.tags ?? [],
-        category: input.category ?? 'general',
-        importance: input.importance ?? 3,
-        title: input.title,
-        content: input.content,
-      };
-
+    return this.repository.withLock(async () => {
       try {
-        // Wait for WAL initialization before any write
-        if (this.initPromise) {
-          await this.initPromise;
-        }
-
-        // WAL append first for durability
-        const walOffset = await this.wal.append('create', id);
-
-        // Persist to disk
-        const filePath = await this.storage.write(memory);
+        const { memory, filePath, walOffset } = await this.repository.create(input);
 
         // Async vector index (with walOffset)
-        this.scheduleVectorUpsert(memory, walOffset);
+        this.scheduleUpsert(memory, walOffset);
 
-        return { id, filePath, memory };
+        return { id: memory.id, filePath, memory };
       } catch (error) {
         throw new ServiceError(
           `Failed to create memory: ${error instanceof Error ? error.message : 'Unknown error'}`,
           ErrorCode.STORAGE_ERROR
         );
       }
-    } finally {
-      await release();
-    }
+    });
   }
 
   /**
@@ -398,90 +357,40 @@ export class MemoryService {
    * Updates an existing memory
    */
   async update(input: UpdateMemoryInput): Promise<UpdateResult> {
-    const release = await lockfile.lock(this.storagePath, {
-      retries: { retries: 100, minTimeout: 50, maxTimeout: LOCK_TIMEOUT / 100 },
-    });
-    try {
-      let existing: Memory;
+    return this.repository.withLock(async () => {
       try {
-        existing = await this.storage.read(input.id);
-      } catch (error) {
-        if (error instanceof StorageError && error.message.includes('not found')) {
-          throw new ServiceError(`Memory not found: ${input.id}`, ErrorCode.NOT_FOUND);
-        }
-        throw new ServiceError(
-          `Failed to read memory for update: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          ErrorCode.STORAGE_ERROR
-        );
-      }
-
-      const updated: Memory = {
-        ...existing,
-        updatedAt: new Date().toISOString(),
-        ...(input.title !== undefined && { title: input.title }),
-        ...(input.content !== undefined && { content: input.content }),
-        ...(input.tags !== undefined && { tags: input.tags }),
-        ...(input.category !== undefined && { category: input.category }),
-        ...(input.importance !== undefined && { importance: input.importance }),
-      };
-
-      try {
-        // Wait for WAL init
-        if (this.initPromise) await this.initPromise;
-
-        // WAL append first for durability
-        const walOffset = await this.wal.append('update', updated.id);
-
-        // Persist to disk
-        await this.storage.write(updated);
+        const { memory, walOffset } = await this.repository.update(input);
 
         // Async vector index (with walOffset)
-        this.scheduleVectorUpsert(updated, walOffset);
+        this.scheduleUpsert(memory, walOffset);
 
-        return { memory: updated };
+        return { memory };
       } catch (error) {
+        if (error instanceof ServiceError) throw error;
         throw new ServiceError(
           `Failed to update memory: ${error instanceof Error ? error.message : 'Unknown error'}`,
           ErrorCode.STORAGE_ERROR
         );
       }
-    } finally {
-      await release();
-    }
+    });
   }
 
   /**
    * Deletes a memory by ID
    */
   async delete(input: DeleteMemoryInput): Promise<DeleteResult> {
-    const release = await lockfile.lock(this.storagePath, {
-      retries: { retries: 100, minTimeout: 50, maxTimeout: LOCK_TIMEOUT / 100 },
-    });
-    try {
-      // Wait for WAL init
-      if (this.initPromise) await this.initPromise;
-
-      // WAL append first for durability
-      const walOffset = await this.wal.append('delete', input.id);
-
-      const filePath = await this.storage.delete(input.id);
-      await this.removeFromVectorIndex(input.id);
-
-      // Mark WAL entry as indexed (no vector to index for deletes)
-      await this.wal.markIndexed(walOffset);
-
-      return { success: true, filePath };
-    } catch (error) {
-      if (error instanceof StorageError && error.message.includes('not found')) {
-        throw new ServiceError(`Memory not found: ${input.id}`, ErrorCode.NOT_FOUND);
+    return this.repository.withLock(async () => {
+      try {
+        const { filePath } = await this.repository.delete(input);
+        return { success: true, filePath };
+      } catch (error) {
+        if (error instanceof ServiceError) throw error;
+        throw new ServiceError(
+          `Failed to delete memory: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          ErrorCode.STORAGE_ERROR
+        );
       }
-      throw new ServiceError(
-        `Failed to delete memory: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        ErrorCode.STORAGE_ERROR
-      );
-    } finally {
-      await release();
-    }
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -492,70 +401,7 @@ export class MemoryService {
    * Lists memories with filtering and pagination
    */
   async list(input: ListMemoryInput): Promise<ListResult> {
-    try {
-      const files = await this.storage.list();
-
-      let memories: Memory[] = [];
-      for (const file of files) {
-        try {
-          const memory = await this.storage.read(this.extractIdFromContent(file.content));
-          memories.push(memory);
-        } catch {
-          continue;
-        }
-      }
-
-      if (input.category) {
-        memories = memories.filter(m => m.category === input.category);
-      }
-      if (input.tags && input.tags.length > 0) {
-        memories = memories.filter(m => input.tags!.every(tag => m.tags.includes(tag)));
-      }
-      if (input.fromDate) {
-        memories = memories.filter(m => m.createdAt >= input.fromDate!);
-      }
-      if (input.toDate) {
-        memories = memories.filter(m => m.createdAt <= input.toDate!);
-      }
-
-      const sortBy: SortField = input.sortBy ?? 'createdAt';
-      const sortOrder: SortOrder = input.sortOrder ?? 'desc';
-
-      memories.sort((a, b) => {
-        let comparison = 0;
-        switch (sortBy) {
-          case 'createdAt':
-            comparison = a.createdAt.localeCompare(b.createdAt);
-            break;
-          case 'updatedAt':
-            comparison = a.updatedAt.localeCompare(b.updatedAt);
-            break;
-          case 'title':
-            comparison = a.title.localeCompare(b.title);
-            break;
-          case 'importance':
-            comparison = a.importance - b.importance;
-            break;
-        }
-        return sortOrder === 'asc' ? comparison : -comparison;
-      });
-
-      const total = memories.length;
-      const limit = input.limit ?? 20;
-      const offset = input.offset ?? 0;
-      const paginatedMemories = memories.slice(offset, offset + limit);
-
-      return {
-        memories: paginatedMemories,
-        total,
-        hasMore: offset + limit < total,
-      };
-    } catch (error) {
-      throw new ServiceError(
-        `Failed to list memories: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        ErrorCode.STORAGE_ERROR
-      );
-    }
+    return this.repository.list(input);
   }
 
   /**
@@ -576,88 +422,14 @@ export class MemoryService {
       if (result.results.length > 0) {
         return result;
       }
-      return this.keywordSearch(input);
-    } catch (error) {
-      void this.logger.error('retrieval_pipeline_failed', 'Retrieval pipeline failed, falling back to keyword search');
-      return this.keywordSearch(input);
+      return this.keywordSearcher.search(input);
+    } catch {
+      void this.logger.error(
+        'retrieval_pipeline_failed',
+        'Retrieval pipeline failed, falling back to keyword search'
+      );
+      return this.keywordSearcher.search(input);
     }
-  }
-
-  /**
-   * Legacy keyword-based search (used as fallback when vector search is unavailable).
-   */
-  private async keywordSearch(
-    input: SearchMemoryInput
-  ): Promise<{ results: SearchResult[]; total: number }> {
-    const listResult = await this.list({
-      category: input.category,
-      tags: input.tags,
-      limit: 1000,
-    });
-
-    const query = input.query.toLowerCase();
-    const keywords = query.split(/\s+/).filter(k => k.length > 0);
-    const results: SearchResult[] = [];
-
-    for (const memory of listResult.memories) {
-      let score = 0;
-      const matches: string[] = [];
-
-      const titleLower = memory.title.toLowerCase();
-      if (titleLower.includes(query)) {
-        score += 10;
-        matches.push(memory.title);
-      } else {
-        for (const keyword of keywords) {
-          if (titleLower.includes(keyword)) {
-            score += 5;
-            if (!matches.includes(memory.title)) matches.push(memory.title);
-          }
-        }
-      }
-
-      const contentLower = memory.content.toLowerCase();
-      if (contentLower.includes(query)) {
-        score += 3;
-        const index = contentLower.indexOf(query);
-        const start = Math.max(0, index - 50);
-        const end = Math.min(contentLower.length, index + query.length + 50);
-        matches.push(memory.content.slice(start, end));
-      } else {
-        for (const keyword of keywords) {
-          if (contentLower.includes(keyword)) {
-            score += 1;
-            const index = contentLower.indexOf(keyword);
-            const start = Math.max(0, index - 30);
-            const end = Math.min(contentLower.length, index + keyword.length + 30);
-            const snippet = memory.content.slice(start, end);
-            if (!matches.some(m => m.includes(snippet))) matches.push(snippet);
-          }
-        }
-      }
-
-      for (const tag of memory.tags) {
-        if (
-          tag.toLowerCase().includes(query) ||
-          keywords.some(k => tag.toLowerCase().includes(k))
-        ) {
-          score += 2;
-          matches.push(`Tag: ${tag}`);
-        }
-      }
-
-      if (score > 0) {
-        results.push({
-          memory,
-          score: Math.min(score / 20, 1),
-          matches: matches.slice(0, 3),
-        });
-      }
-    }
-
-    results.sort((a, b) => b.score - a.score);
-    const limit = input.limit ?? 10;
-    return { results: results.slice(0, limit), total: results.length };
   }
 
   // ---------------------------------------------------------------------------
@@ -703,20 +475,19 @@ export class MemoryService {
    * memory_update — unified write API (append/upsert)
    */
   async memoryUpdate(input: MemoryUpdateInput): Promise<MemoryUpdateOutput> {
-    const release = await lockfile.lock(this.storagePath, {
-      retries: { retries: 100, minTimeout: 50, maxTimeout: LOCK_TIMEOUT / 100 },
-    });
-    try {
+    return this.repository.withLock(async () => {
       // Wait for WAL init
       if (this.initPromise) await this.initPromise;
 
       const now = new Date().toISOString();
       const sessionId = input.sessionId ?? randomUUID();
       const idempotencyKey = input.idempotencyKey;
-      const fingerprint = idempotencyKey ? this.computeMemoryUpdateFingerprint(input) : null;
+      const fingerprint = idempotencyKey
+        ? this.idempotencyStore.computeFingerprint(input)
+        : null;
 
       if (idempotencyKey && fingerprint) {
-        const replay = await this.findIdempotentReplay(idempotencyKey, fingerprint);
+        const replay = await this.idempotencyStore.findReplay(idempotencyKey, fingerprint);
         if (replay) {
           return {
             ...replay,
@@ -761,7 +532,7 @@ export class MemoryService {
         const filePath = await this.storage.write(updatedMemory);
 
         // Async vector index (with walOffset)
-        this.scheduleVectorUpsert(updatedMemory, walOffset);
+        this.scheduleUpsert(updatedMemory, walOffset);
 
         result = {
           id: updatedMemory.id,
@@ -793,7 +564,7 @@ export class MemoryService {
         const filePath = await this.storage.write(createdMemory);
 
         // Async vector index (with walOffset)
-        this.scheduleVectorUpsert(createdMemory, walOffset);
+        this.scheduleUpsert(createdMemory, walOffset);
 
         result = {
           id,
@@ -806,90 +577,11 @@ export class MemoryService {
       }
 
       if (idempotencyKey && fingerprint) {
-        await this.persistIdempotencyRecord(idempotencyKey, fingerprint, result);
+        await this.idempotencyStore.persistRecord(idempotencyKey, fingerprint, result);
       }
 
       return result;
-    } finally {
-      await release();
-    }
-  }
-
-  private computeMemoryUpdateFingerprint(input: MemoryUpdateInput): string {
-    const canonical = {
-      id: input.id ?? null,
-      sessionId: input.sessionId ?? null,
-      mode: input.mode ?? 'append',
-      entryType: input.entryType ?? null,
-      title: input.title ?? null,
-      content: input.content,
-      tags: input.tags ?? [],
-      category: input.category ?? null,
-      importance: input.importance ?? null,
-    };
-
-    return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
-  }
-
-  private async findIdempotentReplay(
-    key: string,
-    fingerprint: string
-  ): Promise<MemoryUpdateOutput | null> {
-    const index = await this.loadIdempotencyIndex();
-    const record = index[key];
-    if (!record) return null;
-
-    if (record.fingerprint !== fingerprint) {
-      throw new ServiceError(
-        `Idempotency key conflict: ${key}`,
-        ErrorCode.DUPLICATE_ERROR,
-        { idempotencyKey: key }
-      );
-    }
-
-    return record.result;
-  }
-
-  private async persistIdempotencyRecord(
-    key: string,
-    fingerprint: string,
-    result: MemoryUpdateOutput
-  ): Promise<void> {
-    const index = await this.loadIdempotencyIndex();
-    index[key] = {
-      fingerprint,
-      recordedAt: new Date().toISOString(),
-      result,
-    };
-    await this.saveIdempotencyIndex(index);
-  }
-
-  private async loadIdempotencyIndex(): Promise<Record<string, MemoryUpdateIdempotencyRecord>> {
-    try {
-      const raw = await readFile(this.idempotencyFilePath, 'utf-8');
-      return JSON.parse(raw) as Record<string, MemoryUpdateIdempotencyRecord>;
-    } catch (error) {
-      const errorCode =
-        error && typeof error === 'object' && 'code' in error
-          ? (error as { code?: string }).code
-          : undefined;
-      if (errorCode === 'ENOENT') {
-        return {};
-      }
-      throw new ServiceError(
-        `Failed to load idempotency index: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        ErrorCode.STORAGE_ERROR
-      );
-    }
-  }
-
-  private async saveIdempotencyIndex(
-    index: Record<string, MemoryUpdateIdempotencyRecord>
-  ): Promise<void> {
-    await mkdir(dirname(this.idempotencyFilePath), { recursive: true });
-    const tempPath = `${this.idempotencyFilePath}.${process.pid}.${Date.now()}.tmp`;
-    await writeFile(tempPath, JSON.stringify(index), 'utf-8');
-    await rename(tempPath, this.idempotencyFilePath);
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -928,13 +620,5 @@ export class MemoryService {
         ErrorCode.STORAGE_ERROR
       );
     }
-  }
-
-  private extractIdFromContent(content: string): string {
-    const match = content.match(/id:\s*"?([^"\n]+)"?/);
-    if (!match) {
-      throw new Error('Could not extract ID from content');
-    }
-    return match[1].trim();
   }
 }
