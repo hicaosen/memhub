@@ -23,34 +23,47 @@ import type {
   MemoryUpdateInput,
   MemoryLoadOutput,
   MemoryUpdateOutput,
+  TTLLevel,
 } from '../contracts/types.js';
 import { ErrorCode } from '../contracts/types.js';
 import { MarkdownStorage, StorageError } from '../storage/markdown-storage.js';
+import { WALStorage, createWALStorage } from '../storage/wal.js';
 import lockfile from 'proper-lockfile';
-import { getModelByKind, resolveModelPath } from './model-manager/index.js';
-import {
-  AssistedFactExtractor,
-  RuleBasedFactExtractor,
-} from './retrieval/fact-extractor.js';
-import { AssistedIntentRouter, RuleBasedIntentRouter } from './retrieval/intent-router.js';
-import { NodeLlamaTaskAssistant } from './retrieval/llm-assistant.js';
 import { RetrievalPipeline } from './retrieval/pipeline.js';
-import { AssistedQueryRewriter, RuleBasedQueryRewriter } from './retrieval/query-rewriter.js';
-import type {
-  FactExtractor,
-  IntentRouter,
-  LlmTaskAssistant,
-  QueryRewriter,
-  VectorRetriever,
-} from './retrieval/types.js';
+import type { VectorRetriever } from './retrieval/types.js';
 import { VectorRetrieverAdapter } from './retrieval/vector-retriever.js';
 import { createReranker, type RerankerMode } from './retrieval/reranker.js';
+import { createLogger, type Logger } from '../utils/logger.js';
 
 const LOCK_TIMEOUT = 5000; // 5 seconds
 
+/** TTL durations in milliseconds */
+const TTL_DURATIONS: Record<TTLLevel, number | null> = {
+  permanent: null, // Never expire
+  long: 90 * 24 * 60 * 60 * 1000, // 90 days
+  medium: 30 * 24 * 60 * 60 * 1000, // 30 days
+  short: 7 * 24 * 60 * 60 * 1000, // 7 days
+  session: 24 * 60 * 60 * 1000, // 24 hours
+};
+
+/**
+ * Calculates expiration timestamp from TTL level
+ * @param ttl - The TTL level
+ * @param createdAt - The creation timestamp
+ * @returns ISO8601 expiration timestamp or undefined if permanent
+ */
+function calculateExpiresAt(ttl: TTLLevel, createdAt: string): string | undefined {
+  const duration = TTL_DURATIONS[ttl];
+  if (duration === null) return undefined;
+  return new Date(new Date(createdAt).getTime() + duration).toISOString();
+}
+
+// Re-export for use in tests
+export { calculateExpiresAt };
+
 /** Minimal interface required from VectorIndex (avoids static import of native module) */
 interface IVectorIndex {
-  upsert(memory: Memory, vector: number[]): Promise<void>;
+  upsert(memory: Memory, vector: number[], walOffset: number): Promise<void>;
   delete(id: string): Promise<void>;
   search(vector: number[], limit?: number): Promise<Array<{ id: string; _distance: number }>>;
 }
@@ -124,22 +137,33 @@ interface MemoryUpdateIdempotencyRecord {
 export class MemoryService {
   private readonly storagePath: string;
   private readonly storage: MarkdownStorage;
+  private readonly wal: WALStorage;
   private readonly vectorIndex: IVectorIndex | null;
   private readonly embedding: IEmbeddingService | null;
   private readonly vectorSearchEnabled: boolean;
-  private readonly factExtractor: FactExtractor;
   private readonly retrievalPipeline: RetrievalPipeline;
   private readonly idempotencyFilePath: string;
+  private readonly logger: Logger;
+  // eslint-disable-next-line @typescript-eslint/prefer-readonly
+  private initPromise: Promise<void> | null = null;
 
   constructor(config: MemoryServiceConfig) {
     this.storagePath = config.storagePath;
+    this.logger = createLogger({ role: 'daemon' });
     this.idempotencyFilePath = join(
       config.storagePath,
       '.memhub-idempotency',
       'memory-update-index.json'
     );
     this.storage = new MarkdownStorage({ storagePath: config.storagePath });
+    this.wal = createWALStorage(config.storagePath);
     this.vectorSearchEnabled = config.vectorSearch !== false;
+
+    // Initialize WAL
+    this.initPromise = this.wal.initialize().then(() => {
+      // Run recovery for unindexed entries
+      return this.recoverFromWAL();
+    });
 
     if (this.vectorSearchEnabled) {
       // Lazily resolved at runtime — do not use top-level static imports so that
@@ -150,7 +174,9 @@ export class MemoryService {
       // Kick off async initialisation without blocking the constructor.
       // The proxy objects below delegate to the real instances once ready.
       const storagePath = config.storagePath;
-      const initPromise = (async () => {
+      const initPromise = this.initPromise;
+      const vectorInitPromise = (async () => {
+        await initPromise;
         const [{ VectorIndex }, { EmbeddingService }] = await Promise.all([
           import('../storage/vector-index.js'),
           import('./embedding-service.js'),
@@ -161,27 +187,27 @@ export class MemoryService {
 
       // Lightweight proxy that waits for init before delegating
       this.vectorIndex = {
-        upsert: async (memory, vector) => {
-          await initPromise;
-          return resolvedVectorIndex!.upsert(memory, vector);
+        upsert: async (memory, vector, walOffset) => {
+          await vectorInitPromise;
+          return resolvedVectorIndex!.upsert(memory, vector, walOffset);
         },
         delete: async id => {
-          await initPromise;
+          await vectorInitPromise;
           return resolvedVectorIndex!.delete(id);
         },
         search: async (vector, limit) => {
-          await initPromise;
+          await vectorInitPromise;
           return resolvedVectorIndex!.search(vector, limit);
         },
       };
 
       this.embedding = {
         embedMemory: async (title, content) => {
-          await initPromise;
+          await vectorInitPromise;
           return resolvedEmbedding!.embedMemory(title, content);
         },
         embed: async text => {
-          await initPromise;
+          await vectorInitPromise;
           return resolvedEmbedding!.embed(text);
         },
       };
@@ -189,32 +215,6 @@ export class MemoryService {
       this.vectorIndex = null;
       this.embedding = null;
     }
-
-    const llmAssistant = this.createLlmAssistant(config);
-    const ruleFactExtractor = new RuleBasedFactExtractor();
-    const ruleIntentRouter = new RuleBasedIntentRouter();
-    const ruleQueryRewriter = new RuleBasedQueryRewriter();
-
-    this.factExtractor = llmAssistant
-      ? new AssistedFactExtractor({
-          assistant: llmAssistant,
-          fallback: ruleFactExtractor,
-        })
-      : ruleFactExtractor;
-
-    const intentRouter: IntentRouter = llmAssistant
-      ? new AssistedIntentRouter({
-          assistant: llmAssistant,
-          fallback: ruleIntentRouter,
-        })
-      : ruleIntentRouter;
-
-    const queryRewriter: QueryRewriter = llmAssistant
-      ? new AssistedQueryRewriter({
-          assistant: llmAssistant,
-          fallback: ruleQueryRewriter,
-        })
-      : ruleQueryRewriter;
 
     const vectorRetriever: VectorRetriever | undefined =
       this.vectorSearchEnabled && this.vectorIndex && this.embedding
@@ -234,54 +234,18 @@ export class MemoryService {
 
     this.retrievalPipeline = new RetrievalPipeline(
       {
-        listMemories: async input => {
-          const listed = await this.list({
-            category: input.category,
-            tags: input.tags,
-            limit: 1000,
-          });
+        listMemories: async () => {
+          const listed = await this.list({ limit: 1000 });
           return listed.memories;
         },
         vectorRetriever,
       },
       {
-        intentRouter,
-        queryRewriter,
         reranker: createReranker({
           mode: config.rerankerMode ?? 'auto',
         }),
       }
     );
-  }
-
-  private createLlmAssistant(config: MemoryServiceConfig): LlmTaskAssistant | null {
-    const mode = config.llmAssistantMode ?? (process.env.NODE_ENV === 'test' ? 'disabled' : 'auto');
-    if (mode === 'disabled') {
-      return null;
-    }
-
-    try {
-      const model = getModelByKind('llm');
-      if (!model) {
-        return null;
-      }
-      const resolved = resolveModelPath(model);
-      if (!resolved.exists && !config.llmAssistantModelPath) {
-        return null;
-      }
-
-      return new NodeLlamaTaskAssistant({
-        mode: 'auto',
-        modelPath: config.llmAssistantModelPath ?? resolved.modelFile,
-        threads: config.llmAssistantThreads,
-      });
-    } catch (error) {
-      console.warn(
-        '[MemHub] Failed to initialize LLM assistant, using rule-only retrieval:',
-        error
-      );
-      return null;
-    }
   }
 
   // ---------------------------------------------------------------------------
@@ -290,21 +254,24 @@ export class MemoryService {
 
   /**
    * Asynchronously embeds a memory and upserts it into the vector index.
+   * After successful upsert, marks the WAL entry as indexed.
    * Fire-and-forget: failures are logged but do not propagate.
    */
-  private scheduleVectorUpsert(memory: Memory): void {
+  private scheduleVectorUpsert(memory: Memory, walOffset: number): void {
     if (!this.vectorIndex || !this.embedding) return;
 
     const vectorIndex = this.vectorIndex;
     const embedding = this.embedding;
+    const wal = this.wal;
 
     // Intentionally not awaited
     embedding
       .embedMemory(memory.title, memory.content)
-      .then(vec => vectorIndex.upsert(memory, vec))
-      .catch(err => {
+      .then(vec => vectorIndex.upsert(memory, vec, walOffset))
+      .then(() => wal.markIndexed(walOffset))
+      .catch(_err => {
         // Non-fatal: Markdown file is the source of truth
-        console.error('[MemHub] Vector upsert failed (non-fatal):', err);
+        void this.logger.error('vector_upsert_failed', 'Vector upsert failed (non-fatal)');
       });
   }
 
@@ -316,9 +283,44 @@ export class MemoryService {
     if (!this.vectorIndex) return;
     try {
       await this.vectorIndex.delete(id);
-    } catch (err) {
-      console.error('[MemHub] Vector delete failed (non-fatal):', err);
+    } catch (_err) {
+      void this.logger.error('vector_delete_failed', 'Vector delete failed (non-fatal)');
     }
+  }
+
+  /**
+   * Recovers from WAL by replaying unindexed entries.
+   * Called during initialization to ensure crash recovery.
+   */
+  private async recoverFromWAL(): Promise<void> {
+    const unindexed = await this.wal.getUnindexed();
+    if (unindexed.length === 0) return;
+
+    void this.logger.info('wal_recovery_start', `Recovering ${unindexed.length} unindexed WAL entries`);
+
+    for (const entry of unindexed) {
+      try {
+        // Skip deleted entries - they don't need indexing
+        if (entry.operation === 'delete') {
+          await this.wal.markIndexed(entry.offset);
+          continue;
+        }
+
+        // Read the memory from disk and re-index
+        const memory = await this.storage.read(entry.memoryId);
+        if (this.vectorIndex && this.embedding) {
+          const vec = await this.embedding.embedMemory(memory.title, memory.content);
+          await this.vectorIndex.upsert(memory, vec, entry.offset);
+          await this.wal.markIndexed(entry.offset);
+        }
+      } catch (_err) {
+        // Memory may have been deleted, or indexing failed - mark as indexed to skip next time
+        void this.logger.warn('wal_recovery_entry_failed', `Failed to recover WAL entry ${entry.offset}`);
+        await this.wal.markIndexed(entry.offset);
+      }
+    }
+
+    void this.logger.info('wal_recovery_complete', 'WAL recovery complete');
   }
 
   // ---------------------------------------------------------------------------
@@ -340,10 +342,6 @@ export class MemoryService {
         id,
         createdAt: now,
         updatedAt: now,
-        facts: await this.factExtractor.extract({
-          title: input.title,
-          content: input.content,
-        }),
         tags: input.tags ?? [],
         category: input.category ?? 'general',
         importance: input.importance ?? 3,
@@ -352,8 +350,20 @@ export class MemoryService {
       };
 
       try {
+        // Wait for WAL initialization before any write
+        if (this.initPromise) {
+          await this.initPromise;
+        }
+
+        // WAL append first for durability
+        const walOffset = await this.wal.append('create', id);
+
+        // Persist to disk
         const filePath = await this.storage.write(memory);
-        this.scheduleVectorUpsert(memory);
+
+        // Async vector index (with walOffset)
+        this.scheduleVectorUpsert(memory, walOffset);
+
         return { id, filePath, memory };
       } catch (error) {
         throw new ServiceError(
@@ -414,14 +424,20 @@ export class MemoryService {
         ...(input.category !== undefined && { category: input.category }),
         ...(input.importance !== undefined && { importance: input.importance }),
       };
-      updated.facts = await this.factExtractor.extract({
-        title: updated.title,
-        content: updated.content,
-      });
 
       try {
+        // Wait for WAL init
+        if (this.initPromise) await this.initPromise;
+
+        // WAL append first for durability
+        const walOffset = await this.wal.append('update', updated.id);
+
+        // Persist to disk
         await this.storage.write(updated);
-        this.scheduleVectorUpsert(updated);
+
+        // Async vector index (with walOffset)
+        this.scheduleVectorUpsert(updated, walOffset);
+
         return { memory: updated };
       } catch (error) {
         throw new ServiceError(
@@ -442,8 +458,18 @@ export class MemoryService {
       retries: { retries: 100, minTimeout: 50, maxTimeout: LOCK_TIMEOUT / 100 },
     });
     try {
+      // Wait for WAL init
+      if (this.initPromise) await this.initPromise;
+
+      // WAL append first for durability
+      const walOffset = await this.wal.append('delete', input.id);
+
       const filePath = await this.storage.delete(input.id);
       await this.removeFromVectorIndex(input.id);
+
+      // Mark WAL entry as indexed (no vector to index for deletes)
+      await this.wal.markIndexed(walOffset);
+
       return { success: true, filePath };
     } catch (error) {
       if (error instanceof StorageError && error.message.includes('not found')) {
@@ -538,13 +564,21 @@ export class MemoryService {
    */
   async search(input: SearchMemoryInput): Promise<{ results: SearchResult[]; total: number }> {
     try {
-      const result = await this.retrievalPipeline.search(input);
+      const result = await this.retrievalPipeline.search({
+        query: input.query,
+        category: input.category,
+        intents: {
+          primary: 'semantic',
+          fallbacks: ['keyword', 'hybrid'],
+        },
+        limit: input.limit ?? 10,
+      });
       if (result.results.length > 0) {
         return result;
       }
       return this.keywordSearch(input);
     } catch (error) {
-      console.error('[MemHub] Retrieval pipeline failed, falling back to keyword search:', error);
+      void this.logger.error('retrieval_pipeline_failed', 'Retrieval pipeline failed, falling back to keyword search');
       return this.keywordSearch(input);
     }
   }
@@ -643,15 +677,21 @@ export class MemoryService {
       return { items: [memory], total: 1 };
     }
 
-    // Semantic / keyword search
+    // Semantic / keyword search with caller-provided intents and rewrites
     if (input.query) {
-      const searched = await this.search({
+      // Default intents if not provided by caller
+      const intents = input.intents ?? {
+        primary: 'hybrid' as const,
+        fallbacks: ['semantic' as const, 'keyword' as const],
+      };
+
+      const result = await this.retrievalPipeline.search({
         query: input.query,
-        category: input.category,
-        tags: input.tags,
-        limit: input.limit,
+        intents,
+        rewrittenQueries: input.rewrittenQueries,
+        limit: input.limit ?? 10,
       });
-      const items = searched.results.map(r => r.memory);
+      const items = result.results.map(r => r.memory);
       return { items, total: items.length };
     }
 
@@ -667,6 +707,9 @@ export class MemoryService {
       retries: { retries: 100, minTimeout: 50, maxTimeout: LOCK_TIMEOUT / 100 },
     });
     try {
+      // Wait for WAL init
+      if (this.initPromise) await this.initPromise;
+
       const now = new Date().toISOString();
       const sessionId = input.sessionId ?? randomUUID();
       const idempotencyKey = input.idempotencyKey;
@@ -710,13 +753,15 @@ export class MemoryService {
           ...(input.category !== undefined && { category: input.category }),
           ...(input.importance !== undefined && { importance: input.importance }),
         };
-        updatedMemory.facts = await this.factExtractor.extract({
-          title: updatedMemory.title,
-          content: updatedMemory.content,
-        });
 
+        // WAL append first for durability
+        const walOffset = await this.wal.append('update', updatedMemory.id);
+
+        // Persist to disk
         const filePath = await this.storage.write(updatedMemory);
-        this.scheduleVectorUpsert(updatedMemory);
+
+        // Async vector index (with walOffset)
+        this.scheduleVectorUpsert(updatedMemory, walOffset);
 
         result = {
           id: updatedMemory.id,
@@ -734,10 +779,6 @@ export class MemoryService {
           updatedAt: now,
           sessionId,
           entryType: input.entryType,
-          facts: await this.factExtractor.extract({
-            title: input.title ?? 'memory note',
-            content: input.content,
-          }),
           tags: input.tags ?? [],
           category: input.category ?? 'general',
           importance: input.importance ?? 3,
@@ -745,8 +786,14 @@ export class MemoryService {
           content: input.content,
         };
 
+        // WAL append first for durability
+        const walOffset = await this.wal.append('create', id);
+
+        // Persist to disk
         const filePath = await this.storage.write(createdMemory);
-        this.scheduleVectorUpsert(createdMemory);
+
+        // Async vector index (with walOffset)
+        this.scheduleVectorUpsert(createdMemory, walOffset);
 
         result = {
           id,

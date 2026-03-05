@@ -1,24 +1,10 @@
-import type { Memory, MemoryFact, SearchMemoryInput, SearchResult } from '../../contracts/types.js';
+import type { Memory, SearchMemoryInput, SearchResult } from '../../contracts/types.js';
 
-export type RetrievalIntent = 'fact_lookup' | 'keyword_lookup' | 'semantic_lookup';
-
-export type RetrievalPrimary = 'fact' | 'hybrid';
-
-export interface IntentRoute {
-  readonly intent: RetrievalIntent;
-  readonly confidence: number;
-  readonly primary: RetrievalPrimary;
-}
-
-export interface RewriteOutput {
-  readonly normalized: string;
-  readonly variants: readonly string[];
-}
+export type RetrievalPrimary = 'hybrid';
 
 export interface CandidateScoreBreakdown {
   readonly vector: number;
   readonly keyword: number;
-  readonly fact: number;
   readonly importanceBoost: number;
   readonly freshnessBoost: number;
   readonly rerank: number;
@@ -42,27 +28,13 @@ export interface VectorRetriever {
     query: string;
     variants: readonly string[];
     limit: number;
-    category?: string;
-    tags?: readonly string[];
   }): Promise<readonly VectorHit[]>;
 }
 
 export interface RetrievalPipelineContext {
-  listMemories(input: { category?: string; tags?: readonly string[] }): Promise<readonly Memory[]>;
+  listMemories(): Promise<readonly Memory[]>;
   vectorRetriever?: VectorRetriever;
   now?: () => Date;
-}
-
-export interface QueryRewriter {
-  rewrite(query: string): Promise<RewriteOutput>;
-}
-
-export interface IntentRouter {
-  route(query: string): Promise<IntentRoute>;
-}
-
-export interface FactExtractor {
-  extract(input: { title: string; content: string }): Promise<readonly MemoryFact[]>;
 }
 
 export interface Reranker {
@@ -74,12 +46,6 @@ export interface Reranker {
 
 export interface RetrievalPipelinePort {
   search(input: SearchMemoryInput): Promise<{ results: SearchResult[]; total: number }>;
-}
-
-export interface LlmTaskAssistant {
-  routeIntent(query: string): Promise<IntentRoute | null>;
-  rewriteQuery(query: string): Promise<RewriteOutput | null>;
-  extractFacts(input: { title: string; content: string }): Promise<readonly MemoryFact[] | null>;
 }
 
 export type LlmAssistantMode = 'disabled' | 'auto';

@@ -15,7 +15,12 @@ describe('MemoryService Edge Cases', () => {
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'memhub-edge-test-'));
-    memoryService = new MemoryService({ storagePath: tempDir, vectorSearch: false });
+    memoryService = new MemoryService({
+      storagePath: tempDir,
+      vectorSearch: false,
+      llmAssistantMode: 'disabled',
+      rerankerMode: 'lightweight',
+    });
   });
 
   afterEach(() => {
@@ -216,18 +221,6 @@ describe('MemoryService Edge Cases', () => {
         category: 'work',
       });
       expect(result.results.length).toBeGreaterThan(0);
-    });
-
-    it('should recall off-time memory using query rewrite and facts', async () => {
-      await memoryService.create({
-        title: 'User work schedule',
-        content: '用户一般每天加班到21:00，工作时间较长。',
-        tags: ['schedule'],
-      });
-
-      const result = await memoryService.search({ query: '我每天几点下班' });
-      expect(result.results.length).toBeGreaterThan(0);
-      expect(result.results[0].memory.title).toBe('User work schedule');
     });
 
     it('should fallback to keyword search when retrieval pipeline returns empty', async () => {

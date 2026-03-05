@@ -41,19 +41,21 @@ export const ImportanceSchema = z.number().int().min(1).max(5);
 
 /** STM memory entry type */
 export const MemoryEntryTypeSchema = z.enum([
-  'preference', // User likes/dislikes
+  'preference', // User preferences, habits
   'decision', // Technical choices with reasoning
-  'context', // Project/environment information
-  'fact', // Objective knowledge
+  'procedure', // Reusable processes/workflows
+  'constraint', // Project constraints/boundaries
+  'session', // Temporary context for current session
 ]);
 
-/** Structured fact schema */
-export const MemoryFactSchema = z.object({
-  key: z.string().min(1).max(100),
-  value: z.string().min(1).max(200),
-  confidence: z.number().min(0).max(1),
-  source: z.enum(['rule', 'llm', 'manual']),
-});
+/** TTL level schema */
+export const TTLLevelSchema = z.enum([
+  'permanent', // Never expire
+  'long', // 90 days
+  'medium', // 30 days
+  'short', // 7 days
+  'session', // 24 hours
+]);
 
 // ============================================================================
 // Memory Schemas
@@ -64,9 +66,10 @@ export const MemoryFrontMatterSchema = z.object({
   id: UUIDSchema,
   created_at: ISO8601TimestampSchema,
   updated_at: ISO8601TimestampSchema,
+  expires_at: ISO8601TimestampSchema.optional(),
   session_id: UUIDSchema.optional(),
   entry_type: MemoryEntryTypeSchema.optional(),
-  facts: z.array(MemoryFactSchema).optional(),
+  ttl: TTLLevelSchema.optional(),
   tags: z.array(TagSchema).default([]),
   category: CategorySchema.default('general'),
   importance: ImportanceSchema.default(3),
@@ -77,9 +80,10 @@ export const MemorySchema = z.object({
   id: UUIDSchema,
   createdAt: ISO8601TimestampSchema,
   updatedAt: ISO8601TimestampSchema,
+  expiresAt: ISO8601TimestampSchema.optional(),
   sessionId: UUIDSchema.optional(),
   entryType: MemoryEntryTypeSchema.optional(),
-  facts: z.array(MemoryFactSchema).readonly().optional(),
+  ttl: TTLLevelSchema.optional(),
   tags: z.array(z.string()).readonly(),
   category: CategorySchema,
   importance: ImportanceSchema,
@@ -214,13 +218,21 @@ export const SearchMemoryInputSchema = z.object({
   tags: z.array(TagSchema).optional(),
 });
 
+/** Retrieval intent schema */
+export const RetrievalIntentSchema = z.enum(['semantic', 'keyword', 'hybrid']);
+
 /** memory_load input schema */
 export const MemoryLoadInputSchema = z.object({
   id: UUIDSchema.optional(),
   query: z.string().min(1).max(1000).optional(),
-  category: CategorySchema.optional(),
-  tags: z.array(TagSchema).optional(),
-  limit: z.number().int().min(1).max(100).optional(),
+  intents: z
+    .object({
+      primary: RetrievalIntentSchema,
+      fallbacks: z.tuple([RetrievalIntentSchema, RetrievalIntentSchema]),
+    })
+    .optional(),
+  rewrittenQueries: z.tuple([z.string(), z.string(), z.string()]).optional(),
+  limit: z.number().int().min(1).max(100).default(10),
 });
 
 /** memory_update (upsert/append) input schema */
@@ -235,6 +247,7 @@ export const MemoryUpdateInputV2Schema = z.object({
     .optional(),
   mode: z.enum(['append', 'upsert']).default('append'),
   entryType: MemoryEntryTypeSchema.optional(),
+  ttl: TTLLevelSchema.optional(),
   title: z.string().min(1).max(200).optional(),
   content: z.string().min(1).max(100000),
   tags: z.array(TagSchema).optional(),

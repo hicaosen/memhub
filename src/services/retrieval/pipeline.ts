@@ -1,11 +1,7 @@
-import type { Memory, SearchMemoryInput, SearchResult } from '../../contracts/types.js';
+import type { Memory, RetrievalIntent, SearchResult } from '../../contracts/types.js';
 import { scoreCandidate } from './hybrid-scorer.js';
-import { RuleBasedIntentRouter } from './intent-router.js';
-import { RuleBasedQueryRewriter } from './query-rewriter.js';
 import { createReranker } from './reranker.js';
 import type {
-  IntentRouter,
-  QueryRewriter,
   RetrievalCandidate,
   RetrievalPipelineContext,
   Reranker,
@@ -15,7 +11,6 @@ interface InternalCandidateState {
   memory: Memory;
   vectorScore: number;
   keywordScore: number;
-  factScore: number;
   matches: string[];
 }
 
@@ -82,64 +77,58 @@ function scoreKeywordMatch(
   };
 }
 
-function scoreFactMatch(memory: Memory, variants: readonly string[]): number {
-  if (!memory.facts || memory.facts.length === 0) return 0;
-  const query = variants.join(' ');
-  const isScheduleQuery = /(下班|加班|几点|时间|when|time)/i.test(query);
-  if (!isScheduleQuery) return 0;
-
-  const hasOffTime = memory.facts.some(fact => fact.key === 'work_schedule.off_time');
-  return hasOffTime ? 1 : 0;
+/** Internal input type with caller-provided intents and rewrites */
+interface PipelineSearchInput {
+  readonly query: string;
+  readonly category?: string;
+  readonly intents: {
+    readonly primary: RetrievalIntent;
+    readonly fallbacks: readonly [RetrievalIntent, RetrievalIntent];
+  };
+  readonly rewrittenQueries?: readonly [string, string, string];
+  readonly limit: number;
 }
 
 export class RetrievalPipeline {
-  private readonly intentRouter: IntentRouter;
-  private readonly queryRewriter: QueryRewriter;
   private readonly reranker: Reranker;
   private readonly now: () => Date;
 
   constructor(
     private readonly context: RetrievalPipelineContext,
-    deps?: { intentRouter?: IntentRouter; queryRewriter?: QueryRewriter; reranker?: Reranker }
+    deps?: { reranker?: Reranker }
   ) {
-    this.intentRouter = deps?.intentRouter ?? new RuleBasedIntentRouter();
-    this.queryRewriter = deps?.queryRewriter ?? new RuleBasedQueryRewriter();
     this.reranker = deps?.reranker ?? createReranker({ mode: 'auto' });
     this.now = context.now ?? (() => new Date());
   }
 
-  async search(input: SearchMemoryInput): Promise<{ results: SearchResult[]; total: number }> {
-    const routed = await this.intentRouter.route(input.query);
-    const rewritten = await this.queryRewriter.rewrite(input.query);
-    const limit = input.limit ?? 10;
+  async search(input: PipelineSearchInput): Promise<{ results: SearchResult[]; total: number }> {
+    // Build query variants: original + caller-provided rewrites
+    const variants: string[] = [input.query];
+    if (input.rewrittenQueries) {
+      variants.push(...input.rewrittenQueries);
+    }
 
-    const memories = await this.context.listMemories({
-      category: input.category,
-      tags: input.tags,
-    });
+    const limit = input.limit;
+    const memories = await this.context.listMemories();
 
     const stateById = new Map<string, InternalCandidateState>();
     for (const memory of memories) {
-      const keyword = scoreKeywordMatch(memory, rewritten.variants);
-      const factScore = scoreFactMatch(memory, rewritten.variants);
-      if (keyword.score === 0 && factScore === 0) continue;
+      const keyword = scoreKeywordMatch(memory, variants);
+      if (keyword.score === 0) continue;
 
       stateById.set(memory.id, {
         memory,
         vectorScore: 0,
         keywordScore: keyword.score,
-        factScore,
         matches: keyword.matches,
       });
     }
 
     if (this.context.vectorRetriever) {
       const vectorHits = await this.context.vectorRetriever.search({
-        query: rewritten.normalized,
-        variants: rewritten.variants,
+        query: input.query,
+        variants,
         limit: Math.max(limit * 3, 20),
-        category: input.category,
-        tags: input.tags,
       });
 
       const memoryMap = new Map(memories.map(memory => [memory.id, memory]));
@@ -156,19 +145,29 @@ export class RetrievalPipeline {
           memory,
           vectorScore: hit.score,
           keywordScore: 0,
-          factScore: scoreFactMatch(memory, rewritten.variants),
           matches: [...hit.matches],
         });
       }
     }
 
+    // Map caller's intent to internal scoring
+    const intentMap: Record<RetrievalIntent, 'keyword_lookup' | 'semantic_lookup'> = {
+      semantic: 'semantic_lookup',
+      keyword: 'keyword_lookup',
+      hybrid: 'semantic_lookup',
+    };
+
     const candidates: RetrievalCandidate[] = [];
     for (const state of stateById.values()) {
+      // Apply category filter if specified
+      if (input.category && state.memory.category !== input.category) {
+        continue;
+      }
+
       const scored = scoreCandidate({
-        intent: routed.intent,
+        intent: intentMap[input.intents.primary],
         vectorScore: state.vectorScore,
         keywordScore: state.keywordScore,
-        factScore: state.factScore,
         importance: state.memory.importance,
         updatedAt: state.memory.updatedAt,
         now: this.now(),
@@ -179,7 +178,6 @@ export class RetrievalPipeline {
         breakdown: {
           vector: scored.vector,
           keyword: scored.keyword,
-          fact: scored.fact,
           importanceBoost: scored.importanceBoost,
           freshnessBoost: scored.freshnessBoost,
           rerank: scored.rerank,
@@ -192,7 +190,7 @@ export class RetrievalPipeline {
       .sort((a, b) => b.finalScore - a.finalScore)
       .slice(0, Math.max(limit * 3, 20));
     const reranked = await this.reranker.rerank({
-      query: rewritten.normalized,
+      query: input.query,
       candidates: topCandidates,
     });
 

@@ -34,6 +34,11 @@ export interface VectorRow {
   importance: number;
   createdAt: string;
   updatedAt: string;
+  expiresAt?: string;
+  entryType?: string;
+  ttl?: string;
+  /** WAL offset for this entry (used for recovery) */
+  walOffset: number;
 }
 
 export interface VectorSearchResult {
@@ -90,6 +95,10 @@ export class VectorIndex {
         importance: 0,
         createdAt: '',
         updatedAt: '',
+        expiresAt: undefined,
+        entryType: undefined,
+        ttl: undefined,
+        walOffset: -1,
       };
       // LanceDB expects Record<string, unknown>[] but our VectorRow is typed more strictly
       // Cast is safe here as VectorRow is a subset of Record<string, unknown>
@@ -104,7 +113,7 @@ export class VectorIndex {
    * Upserts a memory row into the index.
    * LanceDB doesn't have a native upsert so we delete-then-add.
    */
-  async upsert(memory: Memory, vector: number[]): Promise<void> {
+  async upsert(memory: Memory, vector: number[], walOffset: number): Promise<void> {
     await this.initialize();
     const table = this.table!;
 
@@ -120,6 +129,10 @@ export class VectorIndex {
       importance: memory.importance,
       createdAt: memory.createdAt,
       updatedAt: memory.updatedAt,
+      expiresAt: memory.expiresAt,
+      entryType: memory.entryType,
+      ttl: memory.ttl,
+      walOffset,
     };
 
     // LanceDB expects Record<string, unknown>[] but our VectorRow is typed more strictly

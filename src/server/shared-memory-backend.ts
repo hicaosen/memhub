@@ -156,8 +156,8 @@ export class SharedMemoryBackend implements MemoryBackend {
       meta: {
         hasId: !!input.id,
         hasQuery: !!input.query,
-        category: input.category,
-        tagsCount: input.tags?.length ?? 0,
+        hasIntents: !!input.intents,
+        hasRewrites: !!input.rewrittenQueries,
       },
     });
 
@@ -617,7 +617,9 @@ export class SharedMemoryBackend implements MemoryBackend {
       const socket = new Socket();
       let buffer = '';
       let settled = false;
+      // eslint-disable-next-line prefer-const
       let connectTimeout: NodeJS.Timeout | undefined;
+      // eslint-disable-next-line prefer-const
       let responseTimeout: NodeJS.Timeout | undefined;
 
       const settleError = (error: Error): void => {

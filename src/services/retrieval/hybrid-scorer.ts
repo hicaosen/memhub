@@ -1,4 +1,5 @@
-import type { RetrievalIntent } from './types.js';
+/** Internal scoring intent type (maps from caller's RetrievalIntent) */
+type ScoringIntent = 'keyword_lookup' | 'semantic_lookup';
 
 function clamp01(value: number): number {
   if (value < 0) return 0;
@@ -14,10 +15,9 @@ function freshnessBoost(updatedAt: string, now: Date): number {
 }
 
 export function scoreCandidate(input: {
-  intent: RetrievalIntent;
+  intent: ScoringIntent;
   vectorScore: number;
   keywordScore: number;
-  factScore: number;
   importance: number;
   updatedAt: string;
   now: Date;
@@ -25,22 +25,18 @@ export function scoreCandidate(input: {
 }): {
   vector: number;
   keyword: number;
-  fact: number;
   importanceBoost: number;
   freshnessBoost: number;
   rerank: number;
   finalScore: number;
 } {
-  let weights: { vector: number; keyword: number; fact: number };
+  let weights: { vector: number; keyword: number };
   switch (input.intent) {
-    case 'fact_lookup':
-      weights = { vector: 0.2, keyword: 0.35, fact: 0.45 };
-      break;
     case 'keyword_lookup':
-      weights = { vector: 0.25, keyword: 0.55, fact: 0.2 };
+      weights = { vector: 0.35, keyword: 0.65 };
       break;
     default:
-      weights = { vector: 0.55, keyword: 0.35, fact: 0.1 };
+      weights = { vector: 0.65, keyword: 0.35 };
       break;
   }
 
@@ -50,7 +46,6 @@ export function scoreCandidate(input: {
   const finalScore = clamp01(
     input.vectorScore * weights.vector +
       input.keywordScore * weights.keyword +
-      input.factScore * weights.fact +
       importanceBoost +
       freshBoost +
       rerank
@@ -59,7 +54,6 @@ export function scoreCandidate(input: {
   return {
     vector: input.vectorScore,
     keyword: input.keywordScore,
-    fact: input.factScore,
     importanceBoost,
     freshnessBoost: freshBoost,
     rerank,

@@ -25,25 +25,22 @@ export type Slug = string;
  * Content is split between YAML Front Matter (metadata) and Markdown body
  */
 export type MemoryEntryType =
-  | 'preference' // User likes/dislikes
+  | 'preference' // User preferences, habits
   | 'decision' // Technical choices with reasoning
-  | 'context' // Project/environment information
-  | 'fact'; // Objective knowledge
+  | 'procedure' // Reusable processes/workflows
+  | 'constraint' // Project constraints/boundaries
+  | 'session'; // Temporary context for current session
 
 /**
- * Structured fact extracted from free-form memory text.
- * Keeps memory transparent while enabling precise retrieval.
+ * TTL levels for memory entries
+ * Each level defines how long the memory should be retained
  */
-export interface MemoryFact {
-  /** Namespaced fact key. Example: work_schedule.off_time */
-  readonly key: string;
-  /** Normalized fact value. Example: 21:00 */
-  readonly value: string;
-  /** Confidence score from 0 to 1 */
-  readonly confidence: number;
-  /** Extraction source */
-  readonly source: 'rule' | 'llm' | 'manual';
-}
+export type TTLLevel =
+  | 'permanent' // Never expire
+  | 'long' // 90 days
+  | 'medium' // 30 days
+  | 'short' // 7 days
+  | 'session'; // 24 hours
 
 export interface Memory {
   /** UUID v4 unique identifier */
@@ -54,12 +51,14 @@ export interface Memory {
   readonly createdAt: ISO8601Timestamp;
   /** Last update timestamp in ISO 8601 format */
   updatedAt: ISO8601Timestamp;
+  /** Expiration timestamp in ISO 8601 format (calculated from TTL) */
+  expiresAt?: ISO8601Timestamp;
   /** Session UUID for concurrent CLI isolation */
   sessionId?: UUID;
   /** Memory entry type */
   entryType?: MemoryEntryType;
-  /** Structured facts extracted from content */
-  facts?: readonly MemoryFact[];
+  /** TTL level for retention */
+  ttl?: TTLLevel;
   /** Tags for categorization and search */
   tags: readonly string[];
   /** Category for organization */
@@ -82,9 +81,10 @@ export interface MemoryFrontMatter {
   id: UUID;
   created_at: ISO8601Timestamp;
   updated_at: ISO8601Timestamp;
+  expires_at?: ISO8601Timestamp;
   session_id?: UUID;
   entry_type?: MemoryEntryType;
-  facts?: readonly MemoryFact[];
+  ttl?: TTLLevel;
   tags: readonly string[];
   category: string;
   importance: number;
@@ -262,11 +262,26 @@ export interface SearchMemoryInput extends Partial<MemoryFilter> {
 }
 
 /**
+ * Retrieval intent type - provided by caller's LLM
+ */
+export type RetrievalIntent = 'semantic' | 'keyword' | 'hybrid';
+
+/**
  * Input for memory_load tool
  */
-export interface MemoryLoadInput extends Partial<MemoryFilter> {
+export interface MemoryLoadInput {
+  /** Direct lookup by ID (bypasses search) */
   readonly id?: UUID;
+  /** Search query */
   readonly query?: string;
+  /** Retrieval intents provided by caller's LLM */
+  readonly intents?: {
+    readonly primary: RetrievalIntent;
+    readonly fallbacks: readonly [RetrievalIntent, RetrievalIntent];
+  };
+  /** Query rewrites provided by caller's LLM (3 variants) */
+  readonly rewrittenQueries?: readonly [string, string, string];
+  /** Max results to return */
   readonly limit?: number;
 }
 
@@ -279,6 +294,7 @@ export interface MemoryUpdateInput {
   readonly idempotencyKey?: string;
   readonly mode?: 'append' | 'upsert';
   readonly entryType?: MemoryEntryType;
+  readonly ttl?: TTLLevel;
   readonly title?: string;
   readonly content: string;
   readonly tags?: readonly string[];
@@ -428,3 +444,33 @@ export type Nullable<T> = T | null;
 
 /** Optional fields made required */
 export type RequiredFields<T, K extends keyof T> = Required<Pick<T, K>> & Omit<T, K>;
+
+// ============================================================================
+// WAL Types
+// ============================================================================
+
+/**
+ * WAL entry representing a single write operation
+ */
+export interface WALEntry {
+  /** Sequential offset in the WAL file */
+  readonly offset: number;
+  /** Operation type */
+  readonly operation: 'create' | 'update' | 'delete';
+  /** Memory ID being operated on */
+  readonly memoryId: UUID;
+  /** Timestamp of the operation */
+  readonly timestamp: ISO8601Timestamp;
+  /** Serialized memory data (for create/update) */
+  readonly data?: string;
+  /** Whether this entry has been indexed */
+  indexed: boolean;
+}
+
+/**
+ * WAL configuration
+ */
+export interface WALConfig {
+  /** Path to the WAL file */
+  readonly walPath: string;
+}

@@ -166,12 +166,15 @@ describe('McpServer (SDK)', () => {
       const validInput = MemoryLoadInputSchema.parse({
         query: 'test query',
         limit: 10,
-        category: 'general',
+        intents: {
+          primary: 'semantic',
+          fallbacks: ['keyword', 'hybrid'],
+        },
       });
 
       expect(validInput.query).toBe('test query');
       expect(validInput.limit).toBe(10);
-      expect(validInput.category).toBe('general');
+      expect(validInput.intents?.primary).toBe('semantic');
     });
   });
 
