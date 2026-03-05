@@ -6,15 +6,16 @@
  */
 
 import * as lancedb from '@lancedb/lancedb';
-import { mkdir, access } from 'fs/promises';
+import { mkdir, access, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { constants } from 'fs';
 import type { Memory } from '../contracts/types.js';
+import { VECTOR_DIM } from '../services/embedding-service.js';
 
-/** Vector dimension for bge-m3 embedding model */
-const VECTOR_DIM = 1024;
+const INDEX_SCHEMA_VERSION = 1;
 
 const TABLE_NAME = 'memories';
+const METADATA_FILE = `${TABLE_NAME}.meta.json`;
 
 /** Escape single quotes in id strings to prevent SQL injection */
 function escapeId(id: string): string {
@@ -47,18 +48,27 @@ export interface VectorSearchResult {
   _distance: number;
 }
 
+interface VectorIndexMetadata {
+  schemaVersion: number;
+  tableName: string;
+  vectorDim: number;
+  updatedAt: string;
+}
+
 /**
  * LanceDB vector index wrapper.
  * Data lives at `{storagePath}/.lancedb/`.
  */
 export class VectorIndex {
   private readonly dbPath: string;
+  private readonly metadataPath: string;
   private db: lancedb.Connection | null = null;
   private table: lancedb.Table | null = null;
   private initPromise: Promise<void> | null = null;
 
   constructor(storagePath: string) {
     this.dbPath = join(storagePath, '.lancedb');
+    this.metadataPath = join(this.dbPath, METADATA_FILE);
   }
 
   /** Idempotent initialisation — safe to call multiple times. */
@@ -84,28 +94,99 @@ export class VectorIndex {
     const existingTables = await this.db.tableNames();
     if (existingTables.includes(TABLE_NAME)) {
       this.table = await this.db.openTable(TABLE_NAME);
+      if (await this.needsRebuild()) {
+        await this.db.dropTable(TABLE_NAME);
+        this.table = await this.createTable();
+      }
     } else {
-      // Create table with a dummy row so schema is established, then delete it
-      const dummy: VectorRow = {
-        id: '__init__',
-        vector: new Array(VECTOR_DIM).fill(0) as number[],
-        title: '',
-        category: '',
-        tags: '[]',
-        importance: 0,
-        createdAt: '',
-        updatedAt: '',
-        expiresAt: undefined,
-        entryType: undefined,
-        ttl: undefined,
-        walOffset: -1,
-      };
-      // LanceDB expects Record<string, unknown>[] but our VectorRow is typed more strictly
-      // Cast is safe here as VectorRow is a subset of Record<string, unknown>
-      this.table = await this.db.createTable(TABLE_NAME, [
-        dummy as unknown as Record<string, unknown>,
-      ]);
-      await this.table.delete(`id = '__init__'`);
+      this.table = await this.createTable();
+    }
+
+    await this.writeMetadata();
+  }
+
+  private async createTable(): Promise<lancedb.Table> {
+    // Create table with a dummy row so schema is established, then delete it
+    const dummy: VectorRow = {
+      id: '__init__',
+      vector: new Array(VECTOR_DIM).fill(0) as number[],
+      title: '',
+      category: '',
+      tags: '[]',
+      importance: 0,
+      createdAt: '',
+      updatedAt: '',
+      expiresAt: undefined,
+      entryType: undefined,
+      ttl: undefined,
+      walOffset: -1,
+    };
+    // LanceDB expects Record<string, unknown>[] but our VectorRow is typed more strictly
+    // Cast is safe here as VectorRow is a subset of Record<string, unknown>
+    const table = await this.db!.createTable(TABLE_NAME, [dummy as unknown as Record<string, unknown>]);
+    await table.delete(`id = '__init__'`);
+    return table;
+  }
+
+  private async readMetadata(): Promise<VectorIndexMetadata | null> {
+    try {
+      const raw = await readFile(this.metadataPath, 'utf-8');
+      const parsed = JSON.parse(raw) as Partial<VectorIndexMetadata>;
+      if (
+        typeof parsed.schemaVersion === 'number' &&
+        typeof parsed.tableName === 'string' &&
+        typeof parsed.vectorDim === 'number'
+      ) {
+        return {
+          schemaVersion: parsed.schemaVersion,
+          tableName: parsed.tableName,
+          vectorDim: parsed.vectorDim,
+          updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : new Date(0).toISOString(),
+        };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async writeMetadata(): Promise<void> {
+    const metadata: VectorIndexMetadata = {
+      schemaVersion: INDEX_SCHEMA_VERSION,
+      tableName: TABLE_NAME,
+      vectorDim: VECTOR_DIM,
+      updatedAt: new Date().toISOString(),
+    };
+    await writeFile(this.metadataPath, JSON.stringify(metadata), 'utf-8');
+  }
+
+  private async detectTableVectorDim(): Promise<number | null> {
+    const schema = await this.table!.schema();
+    const vectorField = schema.fields.find(field => field.name === 'vector');
+    if (!vectorField) return null;
+    const dataType = vectorField.type as { listSize?: number };
+    return typeof dataType.listSize === 'number' ? dataType.listSize : null;
+  }
+
+  private async needsRebuild(): Promise<boolean> {
+    const metadata = await this.readMetadata();
+    const schemaVectorDim = await this.detectTableVectorDim();
+
+    if (schemaVectorDim !== null) {
+      return schemaVectorDim !== VECTOR_DIM;
+    }
+
+    if (!metadata) return false;
+    if (metadata.tableName !== TABLE_NAME) return true;
+    if (metadata.schemaVersion !== INDEX_SCHEMA_VERSION) return true;
+    return metadata.vectorDim !== VECTOR_DIM;
+  }
+
+  private assertVectorDim(vector: number[], operation: 'upsert' | 'search'): void {
+    if (vector.length !== VECTOR_DIM) {
+      throw new Error(
+        `VectorIndex: ${operation} expects ${VECTOR_DIM} dimensions, got ${vector.length}`
+      );
     }
   }
 
@@ -113,7 +194,8 @@ export class VectorIndex {
    * Upserts a memory row into the index.
    * LanceDB doesn't have a native upsert so we delete-then-add.
    */
-  async upsert(memory: Memory, vector: number[], walOffset: number): Promise<void> {
+  async upsert(memory: Memory, vector: number[], walOffset = -1): Promise<void> {
+    this.assertVectorDim(vector, 'upsert');
     await this.initialize();
     const table = this.table!;
 
@@ -155,6 +237,7 @@ export class VectorIndex {
    * @returns Array ordered by ascending distance (most similar first)
    */
   async search(vector: number[], limit = 10): Promise<VectorSearchResult[]> {
+    this.assertVectorDim(vector, 'search');
     await this.initialize();
 
     const results = await this.table!.vectorSearch(vector).limit(limit).toArray();

@@ -3,14 +3,16 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'fs';
+import { mkdtempSync, readFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import * as lancedb from '@lancedb/lancedb';
 import { VectorIndex } from '../../src/storage/vector-index.js';
 import type { Memory } from '../../src/contracts/types.js';
+import { VECTOR_DIM } from '../../src/services/embedding-service.js';
 
-/** Build a random 1024-dim float vector (avoids loading the real model) */
-function randomVec(dim = 1024): number[] {
+/** Build a random embedding-dim float vector (avoids loading the real model) */
+function randomVec(dim = VECTOR_DIM): number[] {
   const vec = Array.from({ length: dim }, () => Math.random() * 2 - 1);
   // L2-normalise so cosine distance is meaningful
   const norm = Math.sqrt(vec.reduce((s, v) => s + v * v, 0));
@@ -145,5 +147,40 @@ describe('VectorIndex', () => {
     // Create a new instance pointing to the same directory
     const newIndex = new VectorIndex(tempDir);
     expect(await newIndex.count()).toBe(1);
+  });
+
+  it('should auto-rebuild legacy table when vector dimensions mismatch', async () => {
+    const dbPath = join(tempDir, '.lancedb');
+    const db = await lancedb.connect(dbPath);
+    await db.createTable('memories', [
+      {
+        id: '__legacy__',
+        vector: randomVec(1024),
+        title: '',
+        category: '',
+        tags: '[]',
+        importance: 0,
+        createdAt: '',
+        updatedAt: '',
+        walOffset: -1,
+      },
+    ]);
+
+    const rebuilt = new VectorIndex(tempDir);
+    await rebuilt.initialize();
+
+    const metadata = JSON.parse(readFileSync(join(dbPath, 'memories.meta.json'), 'utf-8')) as {
+      vectorDim: number;
+    };
+    expect(metadata.vectorDim).toBe(VECTOR_DIM);
+
+    await expect(rebuilt.upsert(makeMemory(), randomVec())).resolves.not.toThrow();
+  });
+
+  it('should reject vectors with incorrect dimensions', async () => {
+    const wrongDim = VECTOR_DIM === 768 ? 1024 : 768;
+    await expect(index.search(randomVec(wrongDim), 1)).rejects.toThrow(
+      new RegExp(`expects ${VECTOR_DIM} dimensions, got ${wrongDim}`)
+    );
   });
 });
