@@ -1,8 +1,5 @@
 export { FileIdempotencyStore } from './idempotency-store.js';
-export type {
-  IdempotencyStore,
-  MemoryUpdateIdempotencyRecord,
-} from './idempotency-store.js';
+export type { IdempotencyStore, MemoryUpdateIdempotencyRecord } from './idempotency-store.js';
 
 export { KeywordSearcher } from './keyword-searcher.js';
 

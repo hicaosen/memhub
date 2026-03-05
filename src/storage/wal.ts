@@ -84,7 +84,10 @@ export class WALStorage {
       this.currentOffset += Buffer.byteLength(serialized, 'utf-8');
       return offset;
     } catch (error) {
-      throw new WALError(`Failed to append to WAL: ${error instanceof Error ? error.message : 'Unknown error'}`, error);
+      throw new WALError(
+        `Failed to append to WAL: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        error
+      );
     }
   }
 
@@ -118,13 +121,17 @@ export class WALStorage {
       return this.parse(content);
     } catch (error) {
       // If file doesn't exist, return empty array
-      const errorCode = error && typeof error === 'object' && 'code' in error
-        ? (error as { code?: string }).code
-        : undefined;
+      const errorCode =
+        error && typeof error === 'object' && 'code' in error
+          ? (error as { code?: string }).code
+          : undefined;
       if (errorCode === 'ENOENT') {
         return [];
       }
-      throw new WALError(`Failed to read WAL: ${error instanceof Error ? error.message : 'Unknown error'}`, error);
+      throw new WALError(
+        `Failed to read WAL: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        error
+      );
     }
   }
 
@@ -157,7 +164,10 @@ export class WALStorage {
       await writeFile(this.walPath, '', 'utf-8');
       this.currentOffset = 0;
     } catch (error) {
-      throw new WALError(`Failed to clear WAL: ${error instanceof Error ? error.message : 'Unknown error'}`, error);
+      throw new WALError(
+        `Failed to clear WAL: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        error
+      );
     }
   }
 
@@ -166,13 +176,18 @@ export class WALStorage {
    * Used when updating indexed status
    */
   private async rewrite(entries: WALEntry[]): Promise<void> {
-    const serialized = entries.map(e => JSON.stringify(e)).join(ENTRY_SEPARATOR) + (entries.length > 0 ? ENTRY_SEPARATOR : '');
+    const serialized =
+      entries.map(e => JSON.stringify(e)).join(ENTRY_SEPARATOR) +
+      (entries.length > 0 ? ENTRY_SEPARATOR : '');
 
     try {
       await writeFile(this.walPath, serialized, 'utf-8');
       this.currentOffset = Buffer.byteLength(serialized, 'utf-8');
     } catch (error) {
-      throw new WALError(`Failed to rewrite WAL: ${error instanceof Error ? error.message : 'Unknown error'}`, error);
+      throw new WALError(
+        `Failed to rewrite WAL: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        error
+      );
     }
   }
 

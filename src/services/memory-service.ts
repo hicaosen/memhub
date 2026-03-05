@@ -464,9 +464,7 @@ export class MemoryService implements VectorIndexScheduler {
       const now = new Date().toISOString();
       const sessionId = input.sessionId ?? randomUUID();
       const idempotencyKey = input.idempotencyKey;
-      const fingerprint = idempotencyKey
-        ? this.idempotencyStore.computeFingerprint(input)
-        : null;
+      const fingerprint = idempotencyKey ? this.idempotencyStore.computeFingerprint(input) : null;
 
       if (idempotencyKey && fingerprint) {
         const replay = await this.idempotencyStore.findReplay(idempotencyKey, fingerprint);
@@ -579,5 +577,4 @@ export class MemoryService implements VectorIndexScheduler {
       return result;
     });
   }
-
 }

@@ -2,11 +2,7 @@ import type { SearchMemoryInput, SearchResult, ListResult } from '../../contract
 
 /** Interface for list operation */
 interface IListProvider {
-  list(input: {
-    category?: string;
-    tags?: readonly string[];
-    limit: number;
-  }): Promise<ListResult>;
+  list(input: { category?: string; tags?: readonly string[]; limit: number }): Promise<ListResult>;
 }
 
 /**

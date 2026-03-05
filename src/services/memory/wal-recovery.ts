@@ -81,10 +81,7 @@ export class WALRecovery {
         }
 
         if (this.context.vectorIndex && this.context.embedding) {
-          const vec = await this.context.embedding.embedMemory(
-            memory.title,
-            memory.content
-          );
+          const vec = await this.context.embedding.embedMemory(memory.title, memory.content);
           await this.context.vectorIndex.upsert(memory, vec, entry.offset);
           await this.context.wal.markIndexed(entry.offset);
         }

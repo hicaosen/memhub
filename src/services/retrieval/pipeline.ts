@@ -1,11 +1,7 @@
 import type { Memory, RetrievalIntent, SearchResult } from '../../contracts/types.js';
 import { scoreCandidate } from './hybrid-scorer.js';
 import { createReranker } from './reranker.js';
-import type {
-  RetrievalCandidate,
-  RetrievalPipelineContext,
-  Reranker,
-} from './types.js';
+import type { RetrievalCandidate, RetrievalPipelineContext, Reranker } from './types.js';
 import { isExpired } from '../memory/ttl-utils.js';
 
 interface InternalCandidateState {

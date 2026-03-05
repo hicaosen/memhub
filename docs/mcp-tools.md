@@ -62,16 +62,16 @@ Store new memories or update existing ones.
 
 ### Parameters
 
-| Parameter    | Type     | Required | Description                                |
-| ------------ | -------- | -------- | ------------------------------------------ |
-| `title`      | string   | Yes      | Short, descriptive title                   |
-| `content`    | string   | Yes      | Detailed memory content                    |
-| `idempotencyKey` | string | No | Client-generated retry key to avoid duplicate writes |
-| `tags`       | string[] | No       | Tags for categorization                    |
-| `entryType`  | string   | No       | Memory type (default: `fact`)              |
-| `category`   | string   | No       | Category (e.g., `engineering`, `business`) |
-| `importance` | number   | No       | Importance 1-5 (default: 3)                |
-| `id`         | string   | No       | Existing memory ID to update               |
+| Parameter        | Type     | Required | Description                                          |
+| ---------------- | -------- | -------- | ---------------------------------------------------- |
+| `title`          | string   | Yes      | Short, descriptive title                             |
+| `content`        | string   | Yes      | Detailed memory content                              |
+| `idempotencyKey` | string   | No       | Client-generated retry key to avoid duplicate writes |
+| `tags`           | string[] | No       | Tags for categorization                              |
+| `entryType`      | string   | No       | Memory type (default: `fact`)                        |
+| `category`       | string   | No       | Category (e.g., `engineering`, `business`)           |
+| `importance`     | number   | No       | Importance 1-5 (default: 3)                          |
+| `id`             | string   | No       | Existing memory ID to update                         |
 
 ### Entry Types
 

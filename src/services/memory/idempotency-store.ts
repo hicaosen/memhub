@@ -63,11 +63,9 @@ export class FileIdempotencyStore implements IdempotencyStore {
     if (!record) return null;
 
     if (record.fingerprint !== fingerprint) {
-      throw new ServiceError(
-        `Idempotency key conflict: ${key}`,
-        ErrorCode.DUPLICATE_ERROR,
-        { idempotencyKey: key }
-      );
+      throw new ServiceError(`Idempotency key conflict: ${key}`, ErrorCode.DUPLICATE_ERROR, {
+        idempotencyKey: key,
+      });
     }
 
     return record.result;
@@ -76,11 +74,7 @@ export class FileIdempotencyStore implements IdempotencyStore {
   /**
    * Persists an idempotency record
    */
-  async persistRecord(
-    key: string,
-    fingerprint: string,
-    result: MemoryUpdateOutput
-  ): Promise<void> {
+  async persistRecord(key: string, fingerprint: string, result: MemoryUpdateOutput): Promise<void> {
     const index = await this.loadIndex();
     index[key] = {
       fingerprint,
@@ -119,9 +113,7 @@ export class FileIdempotencyStore implements IdempotencyStore {
   /**
    * Saves the idempotency index to disk atomically
    */
-  private async saveIndex(
-    index: Record<string, MemoryUpdateIdempotencyRecord>
-  ): Promise<void> {
+  private async saveIndex(index: Record<string, MemoryUpdateIdempotencyRecord>): Promise<void> {
     await mkdir(dirname(this.filePath), { recursive: true });
     const tempPath = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
     await writeFile(tempPath, JSON.stringify(index), 'utf-8');

@@ -3,7 +3,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { TTL_DURATIONS, calculateExpiresAt, isExpired } from '../../../src/services/memory/ttl-utils.js';
+import {
+  TTL_DURATIONS,
+  calculateExpiresAt,
+  isExpired,
+} from '../../../src/services/memory/ttl-utils.js';
 import type { TTLLevel } from '../../../src/contracts/types.js';
 
 describe('TTL Utilities', () => {
