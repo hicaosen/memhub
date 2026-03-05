@@ -82,8 +82,7 @@ describe('FileIdempotencyStore', () => {
   // ── #18: no stale in-memory cache ─────────────────────────────────────────
 
   describe('#18: no stale cache across process boundaries', () => {
-    it('should pick up records written by an external process after clearCache', async () => {
-      // Simulate another process writing directly to the index file
+    it('should pick up records written by an external process', async () => {
       const externalKey = 'external-key';
       const externalFp = 'external-fingerprint-abc123';
       const externalOutput = makeOutput('external-id');
@@ -97,9 +96,6 @@ describe('FileIdempotencyStore', () => {
       };
       writeFileSync(join(tempDir, 'idempotency.json'), JSON.stringify(externalIndex), 'utf-8');
 
-      // clearCache simulates a fresh state (no prior in-memory load)
-      store.clearCache();
-
       const replay = await store.findReplay(externalKey, externalFp);
       expect(replay).not.toBeNull();
       expect(replay?.id).toBe('external-id');
@@ -108,15 +104,12 @@ describe('FileIdempotencyStore', () => {
     it('should not return stale cached result after the index file is replaced externally', async () => {
       const key = 'shared-key';
 
-      // Process A: persist a record (populates in-memory cache)
       const fpA = store.computeFingerprint(makeInput({ content: 'process-A' }));
       await store.persistRecord(key, fpA, makeOutput('id-a'));
 
-      // Verify in-memory cache contains process A's data
       const replayA = await store.findReplay(key, fpA);
       expect(replayA?.id).toBe('id-a');
 
-      // Process B: writes a completely different record to the file on disk
       const fpB = 'fp-process-b';
       const indexB = {
         [key]: {
@@ -127,10 +120,6 @@ describe('FileIdempotencyStore', () => {
       };
       writeFileSync(join(tempDir, 'idempotency.json'), JSON.stringify(indexB), 'utf-8');
 
-      // Simulate process A restarting (cache cleared)
-      store.clearCache();
-
-      // Must now see process B's data, not the stale cache
       const replayB = await store.findReplay(key, fpB);
       expect(replayB?.id).toBe('id-b');
     });

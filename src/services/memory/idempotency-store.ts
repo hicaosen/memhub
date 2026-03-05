@@ -28,7 +28,6 @@ export interface IdempotencyStore {
  */
 export class FileIdempotencyStore implements IdempotencyStore {
   private readonly filePath: string;
-  private cache: Record<string, MemoryUpdateIdempotencyRecord> | null = null;
 
   constructor(filePath: string) {
     this.filePath = filePath;
@@ -84,23 +83,19 @@ export class FileIdempotencyStore implements IdempotencyStore {
   }
 
   /**
-   * Loads the idempotency index from disk (with caching)
+   * Loads the idempotency index from disk
    */
   private async loadIndex(): Promise<Record<string, MemoryUpdateIdempotencyRecord>> {
-    if (this.cache) return this.cache;
-
     try {
       const raw = await readFile(this.filePath, 'utf-8');
-      this.cache = JSON.parse(raw) as Record<string, MemoryUpdateIdempotencyRecord>;
-      return this.cache;
+      return JSON.parse(raw) as Record<string, MemoryUpdateIdempotencyRecord>;
     } catch (error) {
       const errorCode =
         error && typeof error === 'object' && 'code' in error
           ? (error as { code?: string }).code
           : undefined;
       if (errorCode === 'ENOENT') {
-        this.cache = {};
-        return this.cache;
+        return {};
       }
       throw new ServiceError(
         `Failed to load idempotency index: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -117,13 +112,5 @@ export class FileIdempotencyStore implements IdempotencyStore {
     const tempPath = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
     await writeFile(tempPath, JSON.stringify(index), 'utf-8');
     await rename(tempPath, this.filePath);
-    this.cache = index;
-  }
-
-  /**
-   * Clears the in-memory cache (useful for testing)
-   */
-  clearCache(): void {
-    this.cache = null;
   }
 }

@@ -281,6 +281,36 @@ export class MemoryRepository {
   }
 
   /**
+   * Lists all memories without pagination (for internal use by retrieval pipeline)
+   */
+  async listAll(): Promise<readonly Memory[]> {
+    try {
+      const files = await this.context.storage.list();
+      const now = new Date();
+
+      const memories: Memory[] = [];
+      for (const file of files) {
+        try {
+          const { frontMatter, title, content } = parseFrontMatter(file.content);
+          const memory = frontMatterToMemory(frontMatter, title, content);
+          if (!isExpired(memory.expiresAt, now)) {
+            memories.push(memory);
+          }
+        } catch {
+          continue;
+        }
+      }
+
+      return memories;
+    } catch (error) {
+      throw new ServiceError(
+        `Failed to list all memories: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        ErrorCode.STORAGE_ERROR
+      );
+    }
+  }
+
+  /**
    * Acquires a lock and executes the operation
    */
   async withLock<T>(operation: () => Promise<T>): Promise<T> {

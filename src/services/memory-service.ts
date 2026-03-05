@@ -210,6 +210,7 @@ export class MemoryService implements VectorIndexScheduler {
     // Initialize keyword searcher
     this.keywordSearcher = new KeywordSearcher({
       list: input => this.list(input),
+      listAll: () => this.repository.listAll(),
     });
 
     // Initialize retrieval pipeline
@@ -231,10 +232,7 @@ export class MemoryService implements VectorIndexScheduler {
 
     this.retrievalPipeline = new RetrievalPipeline(
       {
-        listMemories: async () => {
-          const listed = await this.list({ limit: 10000 });
-          return listed.memories;
-        },
+        listMemories: () => this.repository.listAll(),
         vectorRetriever,
       },
       {

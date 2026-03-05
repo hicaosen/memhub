@@ -1,8 +1,9 @@
-import type { SearchMemoryInput, SearchResult, ListResult } from '../../contracts/types.js';
+import type { Memory, SearchMemoryInput, SearchResult, ListResult } from '../../contracts/types.js';
 
 /** Interface for list operation */
 interface IListProvider {
   list(input: { category?: string; tags?: readonly string[]; limit: number }): Promise<ListResult>;
+  listAll?(): Promise<readonly Memory[]>;
 }
 
 /**
@@ -19,17 +20,15 @@ export class KeywordSearcher {
    * Performs keyword-based search on memories
    */
   async search(input: SearchMemoryInput): Promise<{ results: SearchResult[]; total: number }> {
-    const listResult = await this.listProvider.list({
-      category: input.category,
-      tags: input.tags,
-      limit: 1000,
-    });
+    const memories = this.listProvider.listAll
+      ? await this.listProvider.listAll()
+      : (await this.listProvider.list({ limit: 10000 })).memories;
 
     const query = input.query.toLowerCase();
     const keywords = query.split(/\s+/).filter(k => k.length > 0);
     const results: SearchResult[] = [];
 
-    for (const memory of listResult.memories) {
+    for (const memory of memories) {
       let score = 0;
       const matches: string[] = [];
 
