@@ -107,15 +107,10 @@ async function runCli(args: string[]): Promise<void> {
     process.exit(0);
   }
 
-  // Support both 'init' (deprecated) and 'install'
-  if (command !== 'install' && command !== 'init') {
+  if (command !== 'install') {
     p.log.error(`Unknown command: ${command}`);
     p.log.info('Run "memhub --help" for usage information.');
     process.exit(1);
-  }
-
-  if (command === 'init') {
-    p.log.warn("'init' is deprecated, use 'install' instead");
   }
 
   // Parse install options
