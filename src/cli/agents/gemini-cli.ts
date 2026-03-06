@@ -7,7 +7,7 @@ export function generateGeminiCliConfig(_memhubPath: string): Record<string, unk
     mcpServers: {
       memhub: {
         command: 'npx',
-        args: ['-y', '@synth-coder/memhub@latest'],
+        args: ['-y', 'memhub@latest'],
       },
     },
   };

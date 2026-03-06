@@ -229,7 +229,7 @@ describe('CLI Init Command', () => {
           };
         };
       };
-      expect(parsed.mcp_servers?.memhub?.args).toEqual(['-y', '@synth-coder/memhub@latest']);
+      expect(parsed.mcp_servers?.memhub?.args).toEqual(['-y', 'memhub@latest']);
     });
 
     it('should merge codex TOML without breaking array values', () => {
@@ -262,7 +262,7 @@ args = ["-y", "@openai/docs-mcp"]
       };
 
       expect(parsed.mcp_servers?.docs?.args).toEqual(['-y', '@openai/docs-mcp']);
-      expect(parsed.mcp_servers?.memhub?.args).toEqual(['-y', '@synth-coder/memhub@latest']);
+      expect(parsed.mcp_servers?.memhub?.args).toEqual(['-y', 'memhub@latest']);
     });
 
     it('should generate instructions with version tag', () => {
@@ -316,7 +316,7 @@ args = ["-y", "@openai/docs-mcp"]
         mcpServers: {
           memhub: {
             command: 'npx',
-            args: ['-y', '@synth-coder/memhub@latest'],
+            args: ['-y', 'memhub@latest'],
           },
         },
       };

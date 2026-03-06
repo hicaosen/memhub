@@ -7,7 +7,7 @@ export function generateWindsurfConfig(_memhubPath: string): Record<string, unkn
     mcpServers: {
       memhub: {
         command: 'npx',
-        args: ['-y', '@synth-coder/memhub@latest'],
+        args: ['-y', 'memhub@latest'],
       },
     },
   };

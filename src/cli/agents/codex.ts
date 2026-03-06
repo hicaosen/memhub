@@ -7,7 +7,7 @@ export function generateCodexConfig(_memhubPath: string): Record<string, unknown
     mcp_servers: {
       memhub: {
         command: 'npx',
-        args: ['-y', '@synth-coder/memhub@latest'],
+        args: ['-y', 'memhub@latest'],
       },
     },
   };

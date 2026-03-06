@@ -11,7 +11,7 @@ Git-friendly memory MCP server for coding agents.
 Configure MemHub for your AI agent with a single command:
 
 ```bash
-npx -y @synth-coder/memhub@latest init
+npx -y memhub@latest init
 ```
 
 This launches an interactive prompt to select your agent. MemHub will:
@@ -34,16 +34,16 @@ This launches an interactive prompt to select your agent. MemHub will:
 
 ```bash
 # Interactive selection (global - default)
-npx -y @synth-coder/memhub@latest init
+npx -y memhub@latest init
 
 # Skip interactive prompt
-npx -y @synth-coder/memhub@latest init -a claude-code
+npx -y memhub@latest init -a claude-code
 
 # Configure for current project only (local)
-npx -y @synth-coder/memhub@latest init -a cursor -l
+npx -y memhub@latest init -a cursor -l
 
 # Update existing configuration
-npx -y @synth-coder/memhub@latest init -a claude-code --force
+npx -y memhub@latest init -a claude-code --force
 ```
 
 | Option | Description |
@@ -55,7 +55,7 @@ npx -y @synth-coder/memhub@latest init -a claude-code --force
 ### Run as MCP Server
 
 ```bash
-npx -y @synth-coder/memhub@latest
+npx -y memhub@latest
 ```
 
 > On Windows, do **not** append `memhub` after the package name.
@@ -69,7 +69,7 @@ If you prefer manual setup, add this to your MCP client config:
   "mcpServers": {
     "memhub": {
       "command": "npx",
-      "args": ["-y", "@synth-coder/memhub@latest"],
+      "args": ["-y", "memhub@latest"],
       "env": {
         "MEMHUB_STORAGE_PATH": "/absolute/path/to/memories",
         "MEMHUB_LOG_LEVEL": "info"
@@ -84,7 +84,7 @@ For Codex (`~/.codex/config.toml`), use TOML key `mcp_servers`:
 ```toml
 [mcp_servers.memhub]
 command = "npx"
-args = ["-y", "@synth-coder/memhub@latest"]
+args = ["-y", "memhub@latest"]
 ```
 
 ---
@@ -183,7 +183,7 @@ This means "testing framework preference" finds memories about "Vitest vs Jest d
 - **Markdown Storage** — Human-readable `.md` files with YAML front matter
 - **Git-Friendly** — Version control, diff, review your memories
 - **MCP Protocol** — Works with Claude Code, Cursor, Cline, Windsurf, and more
-- **One-Line Setup** — `npx -y @synth-coder/memhub@latest init`
+- **One-Line Setup** — `npx -y memhub@latest init`
 
 ---
 
@@ -278,7 +278,7 @@ memhub/
 - [x] CLI init command for quick setup
 - [ ] Integration tests
 - [ ] Performance improvements
-- [x] npm release (`@synth-coder/memhub@0.2.6`)
+- [x] npm release (`memhub@0.2.6`)
 
 ---
 

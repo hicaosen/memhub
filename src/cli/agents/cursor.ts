@@ -7,7 +7,7 @@ export function generateCursorConfig(_memhubPath: string): Record<string, unknow
     mcpServers: {
       memhub: {
         command: 'npx',
-        args: ['-y', '@synth-coder/memhub@latest'],
+        args: ['-y', 'memhub@latest'],
       },
     },
   };
