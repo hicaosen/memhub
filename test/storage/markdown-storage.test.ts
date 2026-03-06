@@ -4,18 +4,22 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, existsSync, readFileSync } from 'fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { MarkdownStorage, StorageError } from '../../src/storage/markdown-storage.js';
+import { getMemoriesPath } from '../../src/storage/paths.js';
 import type { Memory } from '../../src/contracts/types.js';
 
 describe('MarkdownStorage', () => {
   let tempDir: string;
+  let memoriesDir: string;
   let storage: MarkdownStorage;
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'memhub-storage-test-'));
+    memoriesDir = getMemoriesPath(tempDir);
+    mkdirSync(memoriesDir, { recursive: true });
     storage = new MarkdownStorage({ storagePath: tempDir });
   });
 
@@ -79,7 +83,7 @@ importance: 3
 
 This is the content.
 `;
-      const filePath = join(tempDir, 'test.md');
+      const filePath = join(memoriesDir, 'test.md');
       // Use sync write for test setup
       const { writeFileSync } = await import('fs');
       writeFileSync(filePath, testContent);
@@ -108,7 +112,7 @@ importance: 4
 Test content.
 `;
       const { writeFileSync } = await import('fs');
-      writeFileSync(join(tempDir, 'test.md'), testContent);
+      writeFileSync(join(memoriesDir, 'test.md'), testContent);
 
       const memory = await storage.read('550e8400-e29b-41d4-a716-446655440000');
       expect(memory.importance).toBe(4);
@@ -127,7 +131,7 @@ importance: 3
 
 # Test
 `;
-      const filePath = join(tempDir, 'test.md');
+      const filePath = join(memoriesDir, 'test.md');
       const { writeFileSync } = await import('fs');
       writeFileSync(filePath, testContent);
 
@@ -146,11 +150,11 @@ importance: 3
     it('should list all memory files', async () => {
       const { writeFileSync } = await import('fs');
       writeFileSync(
-        join(tempDir, '2024-03-15-a.md'),
+        join(memoriesDir, '2024-03-15-a.md'),
         '---\nid: "a"\ncreated_at: "2024-03-15T10:30:00Z"\nupdated_at: "2024-03-15T10:30:00Z"\nimportance: 3\n---\n\n# A'
       );
       writeFileSync(
-        join(tempDir, '2024-03-16-b.md'),
+        join(memoriesDir, '2024-03-16-b.md'),
         '---\nid: "b"\ncreated_at: "2024-03-16T10:30:00Z"\nupdated_at: "2024-03-16T10:30:00Z"\nimportance: 3\n---\n\n# B'
       );
 
@@ -166,10 +170,10 @@ importance: 3
     it('should only include .md files', async () => {
       const { writeFileSync } = await import('fs');
       writeFileSync(
-        join(tempDir, 'test.md'),
+        join(memoriesDir, 'test.md'),
         '---\nid: "test"\ncreated_at: "2024-03-15T10:30:00Z"\nupdated_at: "2024-03-15T10:30:00Z"\nimportance: 3\n---\n\n# Test'
       );
-      writeFileSync(join(tempDir, 'test.txt'), 'not markdown');
+      writeFileSync(join(memoriesDir, 'test.txt'), 'not markdown');
 
       const files = await storage.list();
       expect(files).toHaveLength(1);
@@ -189,7 +193,7 @@ importance: 3
 # Test
 `;
       const { writeFileSync } = await import('fs');
-      writeFileSync(join(tempDir, 'test.md'), testContent);
+      writeFileSync(join(memoriesDir, 'test.md'), testContent);
 
       const filePath = await storage.findById('550e8400-e29b-41d4-a716-446655440000');
       expect(filePath).toContain('test.md');
@@ -245,7 +249,7 @@ importance: 3
     it('findById() on cache miss should scan disk and repopulate cache', async () => {
       // Write a file externally (bypassing MarkdownStorage.write)
       const { writeFileSync, mkdirSync } = await import('fs');
-      const dir = join(tempDir, '2024-06-01', '550e8400-e29b-41d4-a716-446655440999');
+      const dir = join(memoriesDir, '2024-06-01', '550e8400-e29b-41d4-a716-446655440999');
       mkdirSync(dir, { recursive: true });
       const externalPath = join(dir, 'external.md');
       writeFileSync(

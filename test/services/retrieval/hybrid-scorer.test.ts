@@ -30,7 +30,7 @@ describe('scoreCandidate', () => {
     expect(scored.finalScore).toBeLessThanOrEqual(1);
   });
 
-  it('handles stale memories with minimal freshness boost', () => {
+  it('handles stale memories with minimal recency boost', () => {
     const scored = scoreCandidate({
       intent: 'semantic_lookup',
       vectorScore: 0,
@@ -40,7 +40,7 @@ describe('scoreCandidate', () => {
       now,
       rerankScore: -1,
     });
-    expect(scored.freshnessBoost).toBeGreaterThanOrEqual(0);
+    expect(scored.recencyBoost).toBeGreaterThanOrEqual(0);
     expect(scored.rerank).toBe(0);
   });
 });

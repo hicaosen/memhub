@@ -3,11 +3,12 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync } from 'fs';
+import { mkdtempSync, readFileSync, rmSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import * as lancedb from '@lancedb/lancedb';
 import { VectorIndex } from '../../src/storage/vector-index.js';
+import { getLanceDBPath } from '../../src/storage/paths.js';
 import type { Memory } from '../../src/contracts/types.js';
 import { VECTOR_DIM } from '../../src/services/embedding-service.js';
 
@@ -147,8 +148,9 @@ describe('VectorIndex', () => {
     expect(await newIndex.count()).toBe(1);
   });
 
-  it('should auto-rebuild legacy table when vector dimensions mismatch', async () => {
-    const dbPath = join(tempDir, '.lancedb');
+  it('should auto-rebuild table when vector dimensions mismatch', async () => {
+    const dbPath = getLanceDBPath(tempDir);
+    mkdirSync(dirname(dbPath), { recursive: true });
     const db = await lancedb.connect(dbPath);
     await db.createTable('memories', [
       {
@@ -173,8 +175,9 @@ describe('VectorIndex', () => {
     await expect(rebuilt.upsert(makeMemory(), randomVec())).resolves.not.toThrow();
   });
 
-  it('should auto-rebuild legacy table when vector column is missing', async () => {
-    const dbPath = join(tempDir, '.lancedb');
+  it('should auto-rebuild table when vector column is missing', async () => {
+    const dbPath = getLanceDBPath(tempDir);
+    mkdirSync(dirname(dbPath), { recursive: true });
     const db = await lancedb.connect(dbPath);
     await db.createTable('memories', [
       {

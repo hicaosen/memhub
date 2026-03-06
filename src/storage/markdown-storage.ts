@@ -14,6 +14,7 @@ import {
   FrontMatterError,
 } from './frontmatter-parser.js';
 import { slugify } from '../utils/slugify.js';
+import { getMemoriesPath } from './paths.js';
 
 /**
  * Custom error for storage operations
@@ -144,7 +145,8 @@ export class MarkdownStorage {
     await this.initialize();
 
     try {
-      const markdownPaths = await this.collectMarkdownFiles(this.storagePath);
+      const memoriesPath = getMemoriesPath(this.storagePath);
+      const markdownPaths = await this.collectMarkdownFiles(memoriesPath);
       const files: MemoryFile[] = [];
 
       for (const filePath of markdownPaths) {
@@ -181,7 +183,8 @@ export class MarkdownStorage {
     await this.initialize();
 
     try {
-      const markdownPaths = await this.collectMarkdownFiles(this.storagePath);
+      const memoriesPath = getMemoriesPath(this.storagePath);
+      const markdownPaths = await this.collectMarkdownFiles(memoriesPath);
 
       for (const filePath of markdownPaths) {
         try {
@@ -213,7 +216,7 @@ export class MarkdownStorage {
   /**
    * Generates nested path parts for a memory
    *
-   * Format: {storage}/{YYYY-MM-DD}/{session_uuid}/{timestamp}-{slug}.md
+   * Format: {storage}/memories/{YYYY-MM-DD}/{session_uuid}/{timestamp}-{slug}.md
    */
   private generatePathParts(memory: Memory): { directoryPath: string; filename: string } {
     const date = memory.createdAt.split('T')[0];
@@ -221,7 +224,8 @@ export class MarkdownStorage {
     const titleSlug = slugify(memory.title) || 'untitled';
     const timestamp = memory.createdAt.replace(/[:.]/g, '-');
     const filename = `${timestamp}-${titleSlug}.md`;
-    const directoryPath = join(this.storagePath, date, sessionId);
+    const memoriesPath = getMemoriesPath(this.storagePath);
+    const directoryPath = join(memoriesPath, date, sessionId);
 
     return { directoryPath, filename };
   }

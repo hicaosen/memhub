@@ -14,7 +14,12 @@
       "mcp__zread__get_repo_structure",
       "Bash(sed:*)",
       "Bash(npx vitest:*)",
-      "Bash(gh issue:*)"
+      "Bash(gh issue:*)",
+      "mcp__memhub__memory_load",
+      "mcp__memhub__memory_update",
+      "Bash(openspec new:*)",
+      "Bash(openspec status:*)",
+      "Bash(openspec instructions:*)"
     ]
   }
 }

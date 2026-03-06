@@ -1,7 +1,12 @@
 import type { Memory, RetrievalIntent, SearchResult } from '../../contracts/types.js';
 import { scoreCandidate } from './hybrid-scorer.js';
 import { createReranker } from './reranker.js';
-import type { RetrievalCandidate, RetrievalPipelineContext, Reranker } from './types.js';
+import type {
+  RetrievalCandidate,
+  RetrievalPipelineContext,
+  Reranker,
+  CandidateScoreBreakdown,
+} from './types.js';
 import { isExpired } from '../memory/ttl-utils.js';
 
 interface InternalCandidateState {
@@ -158,17 +163,27 @@ export class RetrievalPipeline {
         importance: state.memory.importance,
         updatedAt: state.memory.updatedAt,
         now: this.now(),
+        entryType: state.memory.entryType,
+        ttl: state.memory.ttl,
+        expiresAt: state.memory.expiresAt,
+        createdAt: state.memory.createdAt,
       });
+
+      const breakdown: CandidateScoreBreakdown = {
+        vector: scored.vector,
+        keyword: scored.keyword,
+        importanceBoost: scored.importanceBoost,
+        recencyBoost: scored.recencyBoost,
+        rerank: scored.rerank,
+        layerWeight: scored.layerWeight,
+        typeWeight: scored.typeWeight,
+        freshnessFactor: scored.freshnessFactor,
+      };
+
       candidates.push({
         memory: state.memory,
         matches: state.matches.slice(0, 4),
-        breakdown: {
-          vector: scored.vector,
-          keyword: scored.keyword,
-          importanceBoost: scored.importanceBoost,
-          freshnessBoost: scored.freshnessBoost,
-          rerank: scored.rerank,
-        },
+        breakdown,
         finalScore: scored.finalScore,
       });
     }

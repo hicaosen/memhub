@@ -8,6 +8,7 @@
 import { readFile, writeFile, appendFile, stat, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import type { WALEntry, WALConfig, UUID } from '../contracts/types.js';
+import { getWALPath } from './paths.js';
 
 /**
  * Default WAL file name
@@ -233,6 +234,6 @@ export class WALError extends Error {
  */
 export function createWALStorage(storagePath: string): WALStorage {
   return new WALStorage({
-    walPath: join(storagePath, 'wal', WAL_FILENAME),
+    walPath: join(getWALPath(storagePath), WAL_FILENAME),
   });
 }

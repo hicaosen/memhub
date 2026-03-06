@@ -6,8 +6,14 @@ export interface CandidateScoreBreakdown {
   readonly vector: number;
   readonly keyword: number;
   readonly importanceBoost: number;
-  readonly freshnessBoost: number;
+  readonly recencyBoost: number;
   readonly rerank: number;
+  /** Weight multiplier based on memory layer (core=1.2, journey=1.0, moment=0.8) */
+  readonly layerWeight: number;
+  /** Weight multiplier based on entry type */
+  readonly typeWeight: number;
+  /** Freshness factor based on time until expiry (0.8-1.0) */
+  readonly freshnessFactor: number;
 }
 
 export interface RetrievalCandidate {

@@ -1,9 +1,10 @@
 import { promises as fs, rmSync } from 'fs';
-import { dirname, join } from 'path';
+import { dirname } from 'path';
 import type { Logger } from '../../utils/logger.js';
 import type { DaemonEndpoint } from './types.js';
 import { PROTOCOL_VERSION } from './types.js';
 import { parseJson } from './ipc-client.js';
+import { getDaemonLockPath, getDaemonJsonPath } from '../../storage/paths.js';
 
 /**
  * Checks if a process is alive
@@ -63,8 +64,8 @@ export class DaemonManager {
   private exitHooksRegistered = false;
 
   constructor(storagePath: string, logger: Logger) {
-    this.lockPath = join(storagePath, '.memhub-daemon.lock');
-    this.endpointPath = join(storagePath, '.memhub-daemon.json');
+    this.lockPath = getDaemonLockPath(storagePath);
+    this.endpointPath = getDaemonJsonPath(storagePath);
     this.logger = logger;
   }
 

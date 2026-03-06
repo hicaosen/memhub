@@ -21,6 +21,8 @@ import type {
 import { ErrorCode } from '../contracts/types.js';
 import { MarkdownStorage, StorageError } from '../storage/markdown-storage.js';
 import { createWALStorage } from '../storage/wal.js';
+import { getIdempotencyPath } from '../storage/paths.js';
+import { runMigration } from '../storage/migration.js';
 import { RetrievalPipeline } from './retrieval/pipeline.js';
 import type { VectorRetriever } from './retrieval/types.js';
 import { VectorRetrieverAdapter } from './retrieval/vector-retriever.js';
@@ -121,7 +123,10 @@ export class MemoryService implements VectorIndexScheduler {
     this.vectorSearchEnabled = config.vectorSearch !== false;
 
     // Initialize idempotency store
-    const idempotencyFilePath = join(config.storagePath, 'idempotency', 'memory-update-index.json');
+    const idempotencyFilePath = join(
+      getIdempotencyPath(config.storagePath),
+      'memory-update-index.json'
+    );
     this.idempotencyStore = new FileIdempotencyStore(idempotencyFilePath);
 
     // Placeholder init promise - will be set below
@@ -185,10 +190,10 @@ export class MemoryService implements VectorIndexScheduler {
       logger: this.logger,
     });
 
-    // Set up init promise for WAL
-    this.initPromise = this.wal.initialize().then(() => {
-      return this.walRecovery.recover();
-    });
+    // Set up init promise: migration → WAL init → recovery
+    this.initPromise = runMigration(this.storagePath, this.logger)
+      .then(() => this.wal.initialize())
+      .then(() => this.walRecovery.recover());
     initPromiseRef = this.initPromise;
 
     // Initialize repository with vector scheduler

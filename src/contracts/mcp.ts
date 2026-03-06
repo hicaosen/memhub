@@ -145,8 +145,14 @@ TIPS:
           type: 'number',
           description: 'Importance level 1-5. 5 = critical, always recall. Default: 3',
         },
+        ttl: {
+          type: 'string',
+          enum: ['permanent', 'long', 'medium', 'short', 'session'],
+          description:
+            'Time-to-live level. "permanent" never expires, "long" = 90 days, "medium" = 30 days, "short" = 7 days, "session" = 24 hours',
+        },
       },
-      required: ['content'],
+      required: ['content', 'ttl'],
       additionalProperties: false,
     },
   },
@@ -211,5 +217,6 @@ export type ToolInput<T extends ToolName> = T extends 'memory_load'
         title?: string;
         content: string;
         importance?: number;
+        ttl: 'permanent' | 'long' | 'medium' | 'short' | 'session';
       }
     : never;

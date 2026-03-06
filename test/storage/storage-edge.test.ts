@@ -4,18 +4,22 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { MarkdownStorage, StorageError } from '../../src/storage/markdown-storage.js';
 import { FrontMatterError } from '../../src/storage/frontmatter-parser.js';
+import { getMemoriesPath } from '../../src/storage/paths.js';
 
 describe('MarkdownStorage Edge Cases', () => {
   let tempDir: string;
+  let memoriesDir: string;
   let storage: MarkdownStorage;
 
   beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), 'memhub-storage-edge-'));
+    tempDir = mkdtempSync(join(tmpdir(), 'memhub-storage-edge-test-'));
+    memoriesDir = getMemoriesPath(tempDir);
+    mkdirSync(memoriesDir, { recursive: true });
     storage = new MarkdownStorage({ storagePath: tempDir });
   });
 
@@ -83,14 +87,14 @@ describe('MarkdownStorage Edge Cases', () => {
   describe('read edge cases', () => {
     it('should throw error for invalid front matter', async () => {
       const invalidContent = '---\ninvalid yaml: [\n---\n\n# Title';
-      writeFileSync(join(tempDir, 'invalid.md'), invalidContent);
+      writeFileSync(join(memoriesDir, 'invalid.md'), invalidContent);
 
       await expect(storage.read('any-id')).rejects.toThrow(StorageError);
     });
 
     it('should throw error for missing required fields', async () => {
       const incompleteContent = '---\nid: "test-id"\n---\n\n# Title';
-      writeFileSync(join(tempDir, 'incomplete.md'), incompleteContent);
+      writeFileSync(join(memoriesDir, 'incomplete.md'), incompleteContent);
 
       await expect(storage.read('test-id')).rejects.toThrow(StorageError);
     });
@@ -105,7 +109,7 @@ importance: 3
 
 Just some content without H1.
 `;
-      writeFileSync(join(tempDir, 'no-title.md'), noTitleContent);
+      writeFileSync(join(memoriesDir, 'no-title.md'), noTitleContent);
 
       const memory = await storage.read('550e8400-e29b-41d4-a716-446655440000');
       expect(memory.title).toBe('');
@@ -125,10 +129,10 @@ importance: 3
 
 # Valid
 `;
-      writeFileSync(join(tempDir, 'valid.md'), validContent);
+      writeFileSync(join(memoriesDir, 'valid.md'), validContent);
 
       // Create invalid file
-      writeFileSync(join(tempDir, 'invalid.md'), 'Not valid markdown');
+      writeFileSync(join(memoriesDir, 'invalid.md'), 'Not valid markdown');
 
       const files = await storage.list();
       expect(files).toHaveLength(2);
@@ -140,8 +144,8 @@ importance: 3
     });
 
     it('should ignore non-markdown files', async () => {
-      writeFileSync(join(tempDir, 'test.txt'), 'Text file');
-      writeFileSync(join(tempDir, 'test.json'), '{}');
+      writeFileSync(join(memoriesDir, 'test.txt'), 'Text file');
+      writeFileSync(join(memoriesDir, 'test.json'), '{}');
 
       const files = await storage.list();
       expect(files).toHaveLength(0);
@@ -155,7 +159,7 @@ importance: 3
     });
 
     it('should skip files with invalid front matter', async () => {
-      writeFileSync(join(tempDir, 'invalid.md'), 'Invalid content');
+      writeFileSync(join(memoriesDir, 'invalid.md'), 'Invalid content');
 
       const result = await storage.findById('any-id');
       expect(result).toBeNull();
@@ -180,8 +184,8 @@ importance: 3
 
 # File 2
 `;
-      writeFileSync(join(tempDir, 'file1.md'), content1);
-      writeFileSync(join(tempDir, 'file2.md'), content2);
+      writeFileSync(join(memoriesDir, 'file1.md'), content1);
+      writeFileSync(join(memoriesDir, 'file2.md'), content2);
 
       const result = await storage.findById('id-2');
       expect(result).toContain('file2.md');

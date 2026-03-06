@@ -8,6 +8,7 @@ import {
   safeUnlink,
 } from '../../../src/server/ipc/daemon-manager.js';
 import type { Logger } from '../../../src/utils/logger.js';
+import { getInternalPath } from '../../../src/storage/paths.js';
 
 function createLoggerStub(): Logger {
   return {
@@ -81,15 +82,17 @@ describe('DaemonManager', () => {
     it('creates correct lock and endpoint paths', () => {
       tempDir = mkdtempSync(join(tmpdir(), 'memhub-daemon-manager-test-'));
       const manager = new DaemonManager(tempDir, createLoggerStub());
+      const internalPath = getInternalPath(tempDir);
 
-      expect(manager.getLockPath()).toBe(join(tempDir, '.memhub-daemon.lock'));
-      expect(manager.getEndpointPath()).toBe(join(tempDir, '.memhub-daemon.json'));
+      expect(manager.getLockPath()).toBe(join(internalPath, 'daemon.lock'));
+      expect(manager.getEndpointPath()).toBe(join(internalPath, 'daemon.json'));
     });
   });
 
   describe('tryBecomeDaemon', () => {
     it('acquires lock when no existing lock', async () => {
       tempDir = mkdtempSync(join(tmpdir(), 'memhub-daemon-manager-test-'));
+      mkdirSync(getInternalPath(tempDir), { recursive: true });
       const manager = new DaemonManager(tempDir, createLoggerStub());
 
       const result = await manager.tryBecomeDaemon();
@@ -100,6 +103,7 @@ describe('DaemonManager', () => {
 
     it('fails when another process holds the lock', async () => {
       tempDir = mkdtempSync(join(tmpdir(), 'memhub-daemon-manager-test-'));
+      mkdirSync(getInternalPath(tempDir), { recursive: true });
       const manager = new DaemonManager(tempDir, createLoggerStub());
 
       // Write a lock file with current process PID (alive)
@@ -115,6 +119,7 @@ describe('DaemonManager', () => {
 
     it('recovers stale lock when process is dead', async () => {
       tempDir = mkdtempSync(join(tmpdir(), 'memhub-daemon-manager-test-'));
+      mkdirSync(getInternalPath(tempDir), { recursive: true });
       const manager = new DaemonManager(tempDir, createLoggerStub());
 
       // Write a lock file with non-existent PID
@@ -130,6 +135,7 @@ describe('DaemonManager', () => {
 
     it('recovers malformed lock file', async () => {
       tempDir = mkdtempSync(join(tmpdir(), 'memhub-daemon-manager-test-'));
+      mkdirSync(getInternalPath(tempDir), { recursive: true });
       const manager = new DaemonManager(tempDir, createLoggerStub());
 
       // Write an invalid JSON lock file
@@ -144,6 +150,7 @@ describe('DaemonManager', () => {
   describe('publishEndpoint', () => {
     it('writes endpoint file', async () => {
       tempDir = mkdtempSync(join(tmpdir(), 'memhub-daemon-manager-test-'));
+      mkdirSync(getInternalPath(tempDir), { recursive: true });
       const manager = new DaemonManager(tempDir, createLoggerStub());
 
       await manager.publishEndpoint({
@@ -162,10 +169,10 @@ describe('DaemonManager', () => {
   describe('waitForEndpoint', () => {
     it('returns endpoint when available', async () => {
       tempDir = mkdtempSync(join(tmpdir(), 'memhub-daemon-manager-test-'));
+      mkdirSync(getInternalPath(tempDir), { recursive: true });
       const manager = new DaemonManager(tempDir, createLoggerStub());
 
       // Write endpoint file
-      mkdirSync(tempDir, { recursive: true });
       writeFileSync(
         manager.getEndpointPath(),
         JSON.stringify({
@@ -192,6 +199,7 @@ describe('DaemonManager', () => {
 
     it('returns null when daemon process is dead', async () => {
       tempDir = mkdtempSync(join(tmpdir(), 'memhub-daemon-manager-test-'));
+      mkdirSync(getInternalPath(tempDir), { recursive: true });
       const manager = new DaemonManager(tempDir, createLoggerStub());
 
       // Write endpoint with dead process
@@ -214,6 +222,7 @@ describe('DaemonManager', () => {
 
     it('throws on protocol version mismatch', async () => {
       tempDir = mkdtempSync(join(tmpdir(), 'memhub-daemon-manager-test-'));
+      mkdirSync(getInternalPath(tempDir), { recursive: true });
       const manager = new DaemonManager(tempDir, createLoggerStub());
 
       // Write endpoint with wrong protocol version
@@ -236,6 +245,7 @@ describe('DaemonManager', () => {
   describe('cleanup', () => {
     it('removes lock and endpoint files', async () => {
       tempDir = mkdtempSync(join(tmpdir(), 'memhub-daemon-manager-test-'));
+      mkdirSync(getInternalPath(tempDir), { recursive: true });
       const manager = new DaemonManager(tempDir, createLoggerStub());
 
       // Create files
