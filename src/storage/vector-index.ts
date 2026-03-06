@@ -124,7 +124,9 @@ export class VectorIndex {
     };
     // LanceDB expects Record<string, unknown>[] but our VectorRow is typed more strictly
     // Cast is safe here as VectorRow is a subset of Record<string, unknown>
-    const table = await this.db!.createTable(TABLE_NAME, [dummy as unknown as Record<string, unknown>]);
+    const table = await this.db!.createTable(TABLE_NAME, [
+      dummy as unknown as Record<string, unknown>,
+    ]);
     await table.delete(`id = '__init__'`);
     return table;
   }
@@ -148,7 +150,8 @@ export class VectorIndex {
           schemaVersion: parsed.schemaVersion,
           tableName: parsed.tableName,
           vectorDim: parsed.vectorDim,
-          updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : new Date(0).toISOString(),
+          updatedAt:
+            typeof parsed.updatedAt === 'string' ? parsed.updatedAt : new Date(0).toISOString(),
         };
       }
       return null;
@@ -270,7 +273,7 @@ export class VectorIndex {
         .toArray()) as VectorSearchResult[];
     }
 
-    return results.map((row) => ({
+    return results.map(row => ({
       id: row.id,
       _distance: row._distance,
     }));

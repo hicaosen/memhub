@@ -119,7 +119,14 @@ describe('SharedMemoryBackend', () => {
       protocolVersion: 1,
     } as const;
 
-    const daemonManager = (backend as { daemonManager: { waitForEndpoint: () => Promise<unknown>; tryBecomeDaemon: () => Promise<unknown> } }).daemonManager;
+    const daemonManager = (
+      backend as {
+        daemonManager: {
+          waitForEndpoint: () => Promise<unknown>;
+          tryBecomeDaemon: () => Promise<unknown>;
+        };
+      }
+    ).daemonManager;
     let waitCallCount = 0;
     daemonManager.waitForEndpoint = async () => {
       waitCallCount += 1;
@@ -127,7 +134,9 @@ describe('SharedMemoryBackend', () => {
     };
     daemonManager.tryBecomeDaemon = async () => ({ becameDaemon: false });
 
-    const resolved = await (backend as { waitForEndpoint: () => Promise<unknown> }).waitForEndpoint();
+    const resolved = await (
+      backend as { waitForEndpoint: () => Promise<unknown> }
+    ).waitForEndpoint();
     expect(resolved).toEqual(endpoint);
   });
 });

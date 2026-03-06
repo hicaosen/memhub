@@ -121,11 +121,7 @@ export class MemoryService implements VectorIndexScheduler {
     this.vectorSearchEnabled = config.vectorSearch !== false;
 
     // Initialize idempotency store
-    const idempotencyFilePath = join(
-      config.storagePath,
-      'idempotency',
-      'memory-update-index.json'
-    );
+    const idempotencyFilePath = join(config.storagePath, 'idempotency', 'memory-update-index.json');
     this.idempotencyStore = new FileIdempotencyStore(idempotencyFilePath);
 
     // Placeholder init promise - will be set below

@@ -10,12 +10,12 @@ Load relevant memories to get context for the current task.
 
 ### Parameters
 
-| Parameter   | Type     | Required | Description                                                 |
-| ----------- | -------- | -------- | ----------------------------------------------------------- |
-| `query`     | string   | No       | Search query to filter memories                             |
-| `rewrittenQueries` | string[] | Yes | Exactly 3 rewritten queries for retrieval expansion        |
-| `limit`     | number   | No       | Max memories to return (default: 10)                        |
-| `entryType` | string   | No       | Filter by type: `preference`, `decision`, `context`, `fact` |
+| Parameter          | Type     | Required | Description                                                 |
+| ------------------ | -------- | -------- | ----------------------------------------------------------- |
+| `query`            | string   | No       | Search query to filter memories                             |
+| `rewrittenQueries` | string[] | Yes      | Exactly 3 rewritten queries for retrieval expansion         |
+| `limit`            | number   | No       | Max memories to return (default: 10)                        |
+| `entryType`        | string   | No       | Filter by type: `preference`, `decision`, `context`, `fact` |
 
 ### Returns
 
@@ -60,15 +60,15 @@ Store new memories or update existing ones.
 
 ### Parameters
 
-| Parameter        | Type     | Required | Description                                          |
-| ---------------- | -------- | -------- | ---------------------------------------------------- |
-| `title`          | string   | Yes      | Short, descriptive title                             |
-| `content`        | string   | Yes      | Detailed memory content                              |
-| `ttl`            | string   | Yes      | TTL policy: `permanent`/`long`/`medium`/`short`/`session` |
-| `idempotencyKey` | string   | No       | Client-generated retry key to avoid duplicate writes |
-| `entryType`      | string   | No       | Memory type (default: `fact`)                        |
-| `importance`     | number   | No       | Importance 1-5 (default: 3)                          |
-| `id`             | string   | No       | Existing memory ID to update                         |
+| Parameter        | Type   | Required | Description                                               |
+| ---------------- | ------ | -------- | --------------------------------------------------------- |
+| `title`          | string | Yes      | Short, descriptive title                                  |
+| `content`        | string | Yes      | Detailed memory content                                   |
+| `ttl`            | string | Yes      | TTL policy: `permanent`/`long`/`medium`/`short`/`session` |
+| `idempotencyKey` | string | No       | Client-generated retry key to avoid duplicate writes      |
+| `entryType`      | string | No       | Memory type (default: `fact`)                             |
+| `importance`     | number | No       | Importance 1-5 (default: 3)                               |
+| `id`             | string | No       | Existing memory ID to update                              |
 
 ### Entry Types
 

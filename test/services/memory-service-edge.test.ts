@@ -52,7 +52,6 @@ describe('MemoryService Edge Cases', () => {
       });
       expect(result.memory.title).toBe('Title with @#$%^&*() special chars!');
     });
-
   });
 
   describe('update edge cases', () => {
@@ -68,7 +67,6 @@ describe('MemoryService Edge Cases', () => {
       });
       expect(updated.memory.importance).toBe(5);
     });
-
   });
 
   describe('list with various filters', () => {
