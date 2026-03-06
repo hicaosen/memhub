@@ -339,6 +339,10 @@ export class SharedMemoryBackend implements MemoryBackend {
       return serverEndpoint;
     }
 
+    // Another process may have won election and is still publishing endpoint.
+    const endpointAfterRace = await this.daemonManager.waitForEndpoint();
+    if (endpointAfterRace) return endpointAfterRace;
+
     throw new Error('Failed to discover running daemon endpoint');
   }
 

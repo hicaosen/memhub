@@ -17,6 +17,7 @@ import { MCP_PROTOCOL_VERSION, TOOL_DEFINITIONS, SERVER_INFO } from '../contract
 import { ErrorCode } from '../contracts/types.js';
 import { SharedMemoryBackend, type MemoryBackend } from './shared-memory-backend.js';
 import type { RerankerMode } from '../services/retrieval/reranker.js';
+import { installStdioLifecycleGuard } from './stdio-lifecycle.js';
 
 // Get package version
 const __filename = fileURLToPath(import.meta.url);
@@ -179,6 +180,12 @@ export function createMcpServer(): Server {
     }
   });
 
+  const previousOnClose = server.onclose;
+  server.onclose = (): void => {
+    previousOnClose?.();
+    void memoryBackend.close();
+  };
+
   return server;
 }
 
@@ -226,11 +233,17 @@ async function main(): Promise<void> {
   const startupReport = buildStartupReport();
   console.error(formatStartupBanner(startupReport));
 
+  const stopLifecycleGuard = installStdioLifecycleGuard();
   const server = createMcpServer();
   const transport = new StdioServerTransport();
 
-  await server.connect(transport);
-  console.error('[MemHub] Ready: MCP Server running on stdio');
+  try {
+    await server.connect(transport);
+    console.error('[MemHub] Ready: MCP Server running on stdio');
+  } catch (error) {
+    stopLifecycleGuard();
+    throw error;
+  }
 }
 
 // Only run main() when this file is executed directly

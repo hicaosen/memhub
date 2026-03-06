@@ -109,4 +109,25 @@ describe('SharedMemoryBackend', () => {
     await daemonOwner.close();
     await client.close();
   });
+
+  it('waitForEndpoint should retry endpoint discovery after losing election race', async () => {
+    const backend = new SharedMemoryBackend({ storagePath: tempDir, vectorSearch: false });
+    const endpoint = {
+      pid: 4321,
+      host: '127.0.0.1',
+      port: 19999,
+      protocolVersion: 1,
+    } as const;
+
+    const daemonManager = (backend as { daemonManager: { waitForEndpoint: () => Promise<unknown>; tryBecomeDaemon: () => Promise<unknown> } }).daemonManager;
+    let waitCallCount = 0;
+    daemonManager.waitForEndpoint = async () => {
+      waitCallCount += 1;
+      return waitCallCount === 1 ? null : endpoint;
+    };
+    daemonManager.tryBecomeDaemon = async () => ({ becameDaemon: false });
+
+    const resolved = await (backend as { waitForEndpoint: () => Promise<unknown> }).waitForEndpoint();
+    expect(resolved).toEqual(endpoint);
+  });
 });

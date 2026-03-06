@@ -13,6 +13,7 @@ import { AGENTS, type AgentType } from './types.js';
 import { initAgent, selectAgentInteractive } from './init.js';
 import { createMcpServer } from '../server/mcp-server.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { installStdioLifecycleGuard } from '../server/stdio-lifecycle.js';
 import {
   MODELS,
   formatBytes,
@@ -43,10 +44,16 @@ const VERSION = packageJson.version || '0.0.0';
  * Start MCP server (no args mode)
  */
 async function startMcpServer(): Promise<void> {
+  const stopLifecycleGuard = installStdioLifecycleGuard();
   const server = createMcpServer();
   const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error('MemHub MCP Server running on stdio');
+  try {
+    await server.connect(transport);
+    console.error('MemHub MCP Server running on stdio');
+  } catch (error) {
+    stopLifecycleGuard();
+    throw error;
+  }
 }
 
 function printHelp(): void {

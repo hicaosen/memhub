@@ -1,4 +1,4 @@
-import { promises as fs } from 'fs';
+import { promises as fs, rmSync } from 'fs';
 import { dirname, join } from 'path';
 import type { Logger } from '../../utils/logger.js';
 import type { DaemonEndpoint } from './types.js';
@@ -34,6 +34,18 @@ export async function safeUnlink(path: string): Promise<void> {
 }
 
 /**
+ * Synchronously unlink a file.
+ * Used only in process exit hooks where async operations are not reliable.
+ */
+function safeUnlinkSync(path: string): void {
+  try {
+    rmSync(path, { force: true });
+  } catch {
+    // Best-effort cleanup only.
+  }
+}
+
+/**
  * Lock file payload structure
  */
 interface LockPayload {
@@ -48,6 +60,7 @@ export class DaemonManager {
   private readonly lockPath: string;
   private readonly endpointPath: string;
   private readonly logger: Logger;
+  private exitHooksRegistered = false;
 
   constructor(storagePath: string, logger: Logger) {
     this.lockPath = join(storagePath, '.memhub-daemon.lock');
@@ -98,11 +111,27 @@ export class DaemonManager {
       const staleRecovered = await this.tryRecoverStaleLock();
       if (!staleRecovered) return { becameDaemon: false };
 
-      await fs.writeFile(this.lockPath, JSON.stringify(lockPayload), {
-        encoding: 'utf8',
-        flag: 'wx',
-      });
-      await this.logger.warn('lock.recovered', 'Recovered stale daemon lock and acquired it');
+      try {
+        await fs.writeFile(this.lockPath, JSON.stringify(lockPayload), {
+          encoding: 'utf8',
+          flag: 'wx',
+        });
+        await this.logger.warn('lock.recovered', 'Recovered stale daemon lock and acquired it');
+      } catch (retryError) {
+        const stillExists =
+          !!retryError &&
+          typeof retryError === 'object' &&
+          'code' in retryError &&
+          (retryError as { code?: string }).code === 'EEXIST';
+        if (stillExists) {
+          await this.logger.info(
+            'lock.race_lost',
+            'Lost daemon lock race after stale lock recovery, continuing as client'
+          );
+          return { becameDaemon: false };
+        }
+        throw retryError;
+      }
     }
 
     // Note: The caller is responsible for starting the server and writing the endpoint
@@ -152,8 +181,10 @@ export class DaemonManager {
   /**
    * Waits for a daemon endpoint to be available
    */
-  async waitForEndpoint(): Promise<DaemonEndpoint | null> {
-    for (let i = 0; i < 40; i += 1) {
+  async waitForEndpoint(maxWaitMs = 5_000, pollIntervalMs = 50): Promise<DaemonEndpoint | null> {
+    const deadline = Date.now() + maxWaitMs;
+
+    while (Date.now() < deadline) {
       try {
         const raw = await fs.readFile(this.endpointPath, 'utf8');
         const endpoint = parseJson<DaemonEndpoint>(raw);
@@ -175,7 +206,7 @@ export class DaemonManager {
 
         return endpoint;
       } catch {
-        await new Promise(resolve => setTimeout(resolve, 25));
+        await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
       }
     }
 
@@ -186,14 +217,27 @@ export class DaemonManager {
    * Registers exit hooks for cleanup
    */
   registerExitHooks(): void {
-    const cleanup = (): void => {
-      void safeUnlink(this.endpointPath);
-      void safeUnlink(this.lockPath);
+    if (this.exitHooksRegistered) return;
+    this.exitHooksRegistered = true;
+
+    const cleanupSync = (): void => {
+      safeUnlinkSync(this.endpointPath);
+      safeUnlinkSync(this.lockPath);
     };
 
-    process.once('exit', cleanup);
-    process.once('SIGINT', cleanup);
-    process.once('SIGTERM', cleanup);
+    const handleSignal = (signal: NodeJS.Signals): void => {
+      void this.logger.warn('daemon.signal', 'Daemon received termination signal', {
+        meta: { signal },
+      });
+      void this.cleanup().finally(() => {
+        process.exit(0);
+      });
+    };
+
+    process.once('exit', cleanupSync);
+    process.once('SIGINT', () => handleSignal('SIGINT'));
+    process.once('SIGTERM', () => handleSignal('SIGTERM'));
+    process.once('SIGHUP', () => handleSignal('SIGHUP'));
   }
 
   /**
