@@ -253,9 +253,11 @@ export class VectorIndex {
     this.assertVectorDim(vector, 'search');
     await this.initialize();
 
-    let results: Record<string, unknown>[];
+    let results: VectorSearchResult[];
     try {
-      results = await this.table!.vectorSearch(vector).limit(limit).toArray();
+      results = (await this.table!.vectorSearch(vector)
+        .limit(limit)
+        .toArray()) as VectorSearchResult[];
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
       const shouldRebuild =
@@ -263,12 +265,14 @@ export class VectorIndex {
         message.includes('query vector dimension');
       if (!shouldRebuild) throw error;
       await this.rebuildTable();
-      results = await this.table!.vectorSearch(vector).limit(limit).toArray();
+      results = (await this.table!.vectorSearch(vector)
+        .limit(limit)
+        .toArray()) as VectorSearchResult[];
     }
 
-    return results.map((row: Record<string, unknown>) => ({
-      id: row['id'] as string,
-      _distance: row['_distance'] as number,
+    return results.map((row) => ({
+      id: row.id,
+      _distance: row._distance,
     }));
   }
 
