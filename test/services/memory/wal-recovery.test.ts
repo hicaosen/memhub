@@ -59,8 +59,8 @@ describe('WALRecovery', () => {
       const recovery = new WALRecovery(context);
       await recovery.recover();
 
-      expect(context.wal.getUnindexed).toHaveBeenCalled();
-      expect(context.wal.markIndexed).not.toHaveBeenCalled();
+      expect(vi.mocked(context.wal).getUnindexed).toHaveBeenCalled();
+      expect(vi.mocked(context.wal).markIndexed).not.toHaveBeenCalled();
     });
 
     it('indexes unindexed create entries', async () => {
@@ -97,10 +97,10 @@ describe('WALRecovery', () => {
       const recovery = new WALRecovery(context);
       await recovery.recover();
 
-      expect(context.storage.read).toHaveBeenCalledWith('mem-1');
+      expect(vi.mocked(context.storage).read).toHaveBeenCalledWith('mem-1');
       expect(mockEmbedding.embedMemory).toHaveBeenCalledWith(memory.title, memory.content);
       expect(mockVectorIndex.upsert).toHaveBeenCalled();
-      expect(context.wal.markIndexed).toHaveBeenCalledWith(1);
+      expect(vi.mocked(context.wal).markIndexed).toHaveBeenCalledWith(1);
     });
 
     it('skips delete entries without indexing', async () => {
@@ -127,8 +127,8 @@ describe('WALRecovery', () => {
       const recovery = new WALRecovery(context);
       await recovery.recover();
 
-      expect(context.storage.read).not.toHaveBeenCalled();
-      expect(context.wal.markIndexed).toHaveBeenCalledWith(1);
+      expect(vi.mocked(context.storage).read).not.toHaveBeenCalled();
+      expect(vi.mocked(context.wal).markIndexed).toHaveBeenCalledWith(1);
     });
 
     it('reconstructs memory from WAL entry data when disk read fails', async () => {
@@ -166,7 +166,7 @@ describe('WALRecovery', () => {
       const recovery = new WALRecovery(context);
       await recovery.recover();
 
-      expect(context.storage.write).toHaveBeenCalled();
+      expect(vi.mocked(context.storage).write).toHaveBeenCalled();
       expect(mockEmbedding.embedMemory).toHaveBeenCalled();
       expect(mockVectorIndex.upsert).toHaveBeenCalled();
     });
@@ -197,7 +197,7 @@ describe('WALRecovery', () => {
       await recovery.recover();
 
       // Should still mark as indexed to avoid infinite retry
-      expect(context.wal.markIndexed).toHaveBeenCalledWith(1);
+      expect(vi.mocked(context.wal).markIndexed).toHaveBeenCalledWith(1);
     });
 
     it('handles multiple entries in order', async () => {
@@ -245,9 +245,9 @@ describe('WALRecovery', () => {
       const recovery = new WALRecovery(context);
       await recovery.recover();
 
-      expect(context.wal.markIndexed).toHaveBeenCalledTimes(2);
-      expect(context.wal.markIndexed).toHaveBeenNthCalledWith(1, 1);
-      expect(context.wal.markIndexed).toHaveBeenNthCalledWith(2, 2);
+      expect(vi.mocked(context.wal).markIndexed).toHaveBeenCalledTimes(2);
+      expect(vi.mocked(context.wal).markIndexed).toHaveBeenNthCalledWith(1, 1);
+      expect(vi.mocked(context.wal).markIndexed).toHaveBeenNthCalledWith(2, 2);
     });
 
     it('works without vectorIndex (null case)', async () => {
@@ -276,8 +276,8 @@ describe('WALRecovery', () => {
       await recovery.recover();
 
       // Should read the memory but not index (no vector index available)
-      expect(context.storage.read).toHaveBeenCalledWith('mem-1');
-      expect(context.wal.markIndexed).not.toHaveBeenCalled();
+      expect(vi.mocked(context.storage).read).toHaveBeenCalledWith('mem-1');
+      expect(vi.mocked(context.wal).markIndexed).not.toHaveBeenCalled();
     });
   });
 });

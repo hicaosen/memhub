@@ -109,9 +109,7 @@ describe('model-downloader', () => {
           }
         }),
       };
-      mockCreateWriteStream.mockReturnValue(
-        mockStream as unknown as ReturnType<typeof mockCreateWriteStream>
-      );
+      mockCreateWriteStream.mockReturnValue(mockStream);
       mockRenameSync.mockReturnValue(undefined);
 
       // Mock fetch
@@ -174,9 +172,7 @@ describe('model-downloader', () => {
           }
         }),
       };
-      mockCreateWriteStream.mockReturnValue(
-        mockStream as unknown as ReturnType<typeof mockCreateWriteStream>
-      );
+      mockCreateWriteStream.mockReturnValue(mockStream);
       mockRenameSync.mockReturnValue(undefined);
 
       // Mock fetch with 206 Partial Content
