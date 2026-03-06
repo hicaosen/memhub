@@ -22,7 +22,7 @@ This launches an interactive prompt to select your agent. MemHub will:
 
 | Agent | Config File | Instructions File |
 |-------|-------------|-------------------|
-| Claude Code | `~/.claude/settings.json` | `~/.claude/CLAUDE.md` |
+| Claude Code | `~/.claude.json` | `~/.claude/CLAUDE.md` |
 | Cursor | `~/.cursor/mcp.json` | `~/.cursorrules` |
 | Cline | `~/.cline/mcp.json` | `~/.clinerules` |
 | Windsurf | `~/.codeium/windsurf/mcp_config.json` | `~/.windsurfrules` |

@@ -21,7 +21,7 @@ This will:
 
 | Agent         | Global Config                         | Local Config                        |
 | ------------- | ------------------------------------- | ----------------------------------- |
-| Claude Code   | `~/.claude/settings.json`             | `.mcp.json`                         |
+| Claude Code   | `~/.claude.json`                      | `.mcp.json`                         |
 | Cursor        | `~/.cursor/mcp.json`                  | `.cursor/mcp.json`                  |
 | Cline         | `~/.cline/mcp.json`                   | `.cline/mcp.json`                   |
 | Windsurf      | `~/.codeium/windsurf/mcp_config.json` | `.codeium/windsurf/mcp_config.json` |

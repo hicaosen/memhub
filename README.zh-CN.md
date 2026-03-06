@@ -71,7 +71,7 @@ npx -y memhub@latest init
 
 | 代理 | 配置文件 | 指令文件 |
 |------|----------|----------|
-| Claude Code | `~/.claude/settings.json` | `~/.claude/CLAUDE.md` |
+| Claude Code | `~/.claude.json` | `~/.claude/CLAUDE.md` |
 | Cursor | `~/.cursor/mcp.json` | `~/.cursorrules` |
 | Cline | `~/.cline/mcp.json` | `~/.clinerules` |
 | Windsurf | `~/.codeium/windsurf/mcp_config.json` | `~/.windsurfrules` |

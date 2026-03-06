@@ -44,7 +44,7 @@ export const AGENTS: readonly AgentConfig[] = [
     name: 'Claude Code',
     description: 'Anthropic CLI for Claude',
     configFile: '.mcp.json',
-    globalConfigFile: '.claude/settings.json',
+    globalConfigFile: '.claude.json',
     configFormat: 'json',
     instructionsFile: 'CLAUDE.md',
     globalInstructionsFile: '.claude/CLAUDE.md',
