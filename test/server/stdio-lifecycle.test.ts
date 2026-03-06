@@ -2,20 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installStdioLifecycleGuard } from '../../src/server/stdio-lifecycle.js';
 
 describe('stdio-lifecycle', () => {
-  let originalPpid: number;
-
   beforeEach(() => {
-    originalPpid = process.ppid;
     vi.useFakeTimers();
   });
 
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
-    Object.defineProperty(process, 'ppid', {
-      value: originalPpid,
-      configurable: true,
-    });
   });
 
   it('sets up a keep-alive timer', () => {
@@ -47,16 +40,11 @@ describe('stdio-lifecycle', () => {
 
   it('exits process when parent process changes', () => {
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+    let mockPpid = 1000;
 
-    installStdioLifecycleGuard();
+    installStdioLifecycleGuard(() => mockPpid);
 
-    // Change ppid after guard is installed
-    Object.defineProperty(process, 'ppid', {
-      value: 9999,
-      configurable: true,
-    });
-
-    // Advance timer by one interval (1000ms)
+    mockPpid = 9999;
     vi.advanceTimersByTime(1000);
 
     expect(exitSpy).toHaveBeenCalledWith(0);
@@ -64,15 +52,11 @@ describe('stdio-lifecycle', () => {
 
   it('exits process when ppid becomes 1 (orphaned)', () => {
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+    let mockPpid = 1000;
 
-    installStdioLifecycleGuard();
+    installStdioLifecycleGuard(() => mockPpid);
 
-    // Simulate becoming orphaned (ppid = 1)
-    Object.defineProperty(process, 'ppid', {
-      value: 1,
-      configurable: true,
-    });
-
+    mockPpid = 1;
     vi.advanceTimersByTime(1000);
 
     expect(exitSpy).toHaveBeenCalledWith(0);
@@ -80,10 +64,10 @@ describe('stdio-lifecycle', () => {
 
   it('does not exit when parent process stays the same', () => {
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+    const mockPpid = 1000;
 
-    installStdioLifecycleGuard();
+    installStdioLifecycleGuard(() => mockPpid);
 
-    // ppid stays the same (original value)
     vi.advanceTimersByTime(1000);
 
     expect(exitSpy).not.toHaveBeenCalled();
