@@ -418,14 +418,29 @@ export class MemoryService implements VectorIndexScheduler {
         fallbacks: ['semantic' as const, 'keyword' as const],
       };
 
-      const result = await this.retrievalPipeline.search({
-        query: input.query,
-        intents,
-        rewrittenQueries: input.rewrittenQueries,
-        limit: input.limit ?? 10,
-      });
-      const items = result.results.map(r => r.memory);
-      return { items, total: items.length };
+      try {
+        const result = await this.retrievalPipeline.search({
+          query: input.query,
+          intents,
+          rewrittenQueries: input.rewrittenQueries,
+          limit: input.limit ?? 10,
+        });
+        const items = result.results.map(r => r.memory);
+        return { items, total: items.length };
+      } catch {
+        void this.logger.error(
+          'memory_load_pipeline_failed',
+          'memory_load retrieval pipeline failed, falling back to keyword search'
+        );
+        const fallback = await this.keywordSearcher.search({
+          query: input.query,
+          limit: input.limit ?? 10,
+        });
+        return {
+          items: fallback.results.map(r => r.memory),
+          total: fallback.total,
+        };
+      }
     }
 
     // No id and no query — return empty (not supported)

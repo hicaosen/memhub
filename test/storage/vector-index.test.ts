@@ -173,6 +173,26 @@ describe('VectorIndex', () => {
     await expect(rebuilt.upsert(makeMemory(), randomVec())).resolves.not.toThrow();
   });
 
+  it('should auto-rebuild legacy table when vector column is missing', async () => {
+    const dbPath = join(tempDir, '.lancedb');
+    const db = await lancedb.connect(dbPath);
+    await db.createTable('memories', [
+      {
+        id: '__legacy__',
+        embedding: randomVec(),
+        title: '',
+        importance: 0,
+        createdAt: '',
+        updatedAt: '',
+        walOffset: -1,
+      },
+    ]);
+
+    const rebuilt = new VectorIndex(tempDir);
+    await expect(rebuilt.initialize()).resolves.not.toThrow();
+    await expect(rebuilt.search(randomVec(), 5)).resolves.not.toThrow();
+  });
+
   it('should reject vectors with incorrect dimensions', async () => {
     const wrongDim = VECTOR_DIM === 768 ? 1024 : 768;
     await expect(index.search(randomVec(wrongDim), 1)).rejects.toThrow(

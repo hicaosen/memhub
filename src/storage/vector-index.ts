@@ -53,6 +53,11 @@ interface VectorIndexMetadata {
   updatedAt: string;
 }
 
+interface TableVectorInfo {
+  hasVectorField: boolean;
+  vectorDim: number | null;
+}
+
 /**
  * LanceDB vector index wrapper.
  * Data lives at `{storagePath}/.lancedb/`.
@@ -124,6 +129,12 @@ export class VectorIndex {
     return table;
   }
 
+  private async rebuildTable(): Promise<void> {
+    await this.db!.dropTable(TABLE_NAME);
+    this.table = await this.createTable();
+    await this.writeMetadata();
+  }
+
   private async readMetadata(): Promise<VectorIndexMetadata | null> {
     try {
       const raw = await readFile(this.metadataPath, 'utf-8');
@@ -156,20 +167,28 @@ export class VectorIndex {
     await writeFile(this.metadataPath, JSON.stringify(metadata), 'utf-8');
   }
 
-  private async detectTableVectorDim(): Promise<number | null> {
+  private async inspectTableVector(): Promise<TableVectorInfo> {
     const schema = await this.table!.schema();
     const vectorField = schema.fields.find(field => field.name === 'vector');
-    if (!vectorField) return null;
+    if (!vectorField) return { hasVectorField: false, vectorDim: null };
     const dataType = vectorField.type as { listSize?: number };
-    return typeof dataType.listSize === 'number' ? dataType.listSize : null;
+    return {
+      hasVectorField: true,
+      vectorDim: typeof dataType.listSize === 'number' ? dataType.listSize : null,
+    };
   }
 
   private async needsRebuild(): Promise<boolean> {
     const metadata = await this.readMetadata();
-    const schemaVectorDim = await this.detectTableVectorDim();
+    const vectorInfo = await this.inspectTableVector();
 
-    if (schemaVectorDim !== null) {
-      return schemaVectorDim !== VECTOR_DIM;
+    // Legacy/corrupt table without `vector` column cannot be searched and must be rebuilt.
+    if (!vectorInfo.hasVectorField) {
+      return true;
+    }
+
+    if (vectorInfo.vectorDim !== null) {
+      return vectorInfo.vectorDim !== VECTOR_DIM;
     }
 
     if (!metadata) return false;
@@ -234,7 +253,18 @@ export class VectorIndex {
     this.assertVectorDim(vector, 'search');
     await this.initialize();
 
-    const results = await this.table!.vectorSearch(vector).limit(limit).toArray();
+    let results: Record<string, unknown>[];
+    try {
+      results = await this.table!.vectorSearch(vector).limit(limit).toArray();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      const shouldRebuild =
+        message.includes('No vector column found to match with the query vector dimension') ||
+        message.includes('query vector dimension');
+      if (!shouldRebuild) throw error;
+      await this.rebuildTable();
+      results = await this.table!.vectorSearch(vector).limit(limit).toArray();
+    }
 
     return results.map((row: Record<string, unknown>) => ({
       id: row['id'] as string,
