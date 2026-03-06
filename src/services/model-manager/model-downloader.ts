@@ -180,12 +180,26 @@ export async function downloadModel(
         if (!retryResponse.ok) {
           throw new Error(`HTTP ${retryResponse.status}: ${retryResponse.statusText}`);
         }
-        return await handleDownload(retryResponse, model, tempFile, resolved.modelFile, 0, onProgress);
+        return await handleDownload(
+          retryResponse,
+          model,
+          tempFile,
+          resolved.modelFile,
+          0,
+          onProgress
+        );
       }
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
-    return await handleDownload(response, model, tempFile, resolved.modelFile, resumeOffset, onProgress);
+    return await handleDownload(
+      response,
+      model,
+      tempFile,
+      resolved.modelFile,
+      resumeOffset,
+      onProgress
+    );
   } catch (error) {
     // Keep temp file for resume (don't delete!)
     const errorMessage = error instanceof Error ? error.message : String(error);
