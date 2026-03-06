@@ -8,8 +8,6 @@ import { describe, it, expect } from 'vitest';
 import {
   UUIDSchema,
   ISO8601TimestampSchema,
-  TagSchema,
-  CategorySchema,
   ImportanceSchema,
   MemorySchema,
   CreateMemoryInputSchema,
@@ -54,51 +52,6 @@ describe('Schema Validation', () => {
     });
   });
 
-  describe('TagSchema', () => {
-    it('should accept valid tag with lowercase letters and hyphens', () => {
-      expect(TagSchema.safeParse('project-management').success).toBe(true);
-    });
-
-    it('should accept tag with numbers', () => {
-      expect(TagSchema.safeParse('task-123').success).toBe(true);
-    });
-
-    it('should reject uppercase letters', () => {
-      expect(TagSchema.safeParse('Project').success).toBe(false);
-    });
-
-    it('should reject spaces', () => {
-      expect(TagSchema.safeParse('project management').success).toBe(false);
-    });
-
-    it('should reject special characters', () => {
-      expect(TagSchema.safeParse('project@work').success).toBe(false);
-    });
-
-    it('should reject empty string', () => {
-      expect(TagSchema.safeParse('').success).toBe(false);
-    });
-
-    it('should reject tags over 50 characters', () => {
-      const longTag = 'a'.repeat(51);
-      expect(TagSchema.safeParse(longTag).success).toBe(false);
-    });
-  });
-
-  describe('CategorySchema', () => {
-    it('should accept valid category', () => {
-      expect(CategorySchema.safeParse('work').success).toBe(true);
-    });
-
-    it('should reject uppercase letters', () => {
-      expect(CategorySchema.safeParse('Work').success).toBe(false);
-    });
-
-    it('should reject empty string', () => {
-      expect(CategorySchema.safeParse('').success).toBe(false);
-    });
-  });
-
   describe('ImportanceSchema', () => {
     it('should accept importance level 1', () => {
       expect(ImportanceSchema.safeParse(1).success).toBe(true);
@@ -126,8 +79,6 @@ describe('Schema Validation', () => {
       id: '550e8400-e29b-41d4-a716-446655440000',
       createdAt: '2024-03-15T10:30:00Z',
       updatedAt: '2024-03-15T10:30:00Z',
-      tags: ['work', 'project'],
-      category: 'general',
       importance: 3,
       title: 'Test Memory',
       content: 'This is test content',
@@ -181,8 +132,6 @@ describe('Schema Validation', () => {
       const input = {
         title: 'New Memory',
         content: 'Content here',
-        tags: ['tag1', 'tag2'],
-        category: 'work',
         importance: 4,
       };
       expect(CreateMemoryInputSchema.safeParse(input).success).toBe(true);
@@ -204,8 +153,6 @@ describe('Schema Validation', () => {
         content: 'Content here',
       };
       const result = CreateMemoryInputSchema.parse(input);
-      expect(result.tags).toEqual([]);
-      expect(result.category).toBe('general');
       expect(result.importance).toBe(3);
     });
   });
@@ -261,8 +208,6 @@ describe('Schema Validation', () => {
 
     it('should accept input with all filters', () => {
       const input = {
-        category: 'work',
-        tags: ['project'],
         fromDate: '2024-01-01T00:00:00Z',
         toDate: '2024-12-31T23:59:59Z',
         limit: 50,

@@ -51,8 +51,6 @@ export type {
   DeleteMemoryOutput,
   ListMemoryOutput,
   SearchMemoryOutput,
-  GetCategoriesOutput,
-  GetTagsOutput,
   // Configuration type
   Config,
 } from './schemas.js';

@@ -41,13 +41,15 @@ describe('SharedMemoryBackend', () => {
     const created = await client.memoryUpdate({
       sessionId: SESSION_ID,
       entryType: 'decision',
+      ttl: 'permanent',
       title: 'Shared daemon write',
       content: 'created by client',
-      category: 'project',
-      tags: ['shared'],
     });
 
-    const loaded = await daemonOwner.memoryLoad({ id: created.id });
+    const loaded = await daemonOwner.memoryLoad({
+      id: created.id,
+      rewrittenQueries: ['shared lookup', 'shared recall', 'shared id'],
+    });
     expect(loaded.total).toBe(1);
     expect(loaded.items[0]?.content).toBe('created by client');
 
@@ -67,10 +69,9 @@ describe('SharedMemoryBackend', () => {
     const created = await second.memoryUpdate({
       sessionId: SESSION_ID,
       entryType: 'fact',
+      ttl: 'permanent',
       title: 'Failover test',
       content: 'second should takeover',
-      category: 'project',
-      tags: ['failover'],
     });
 
     expect(created.id).toBeDefined();
@@ -89,17 +90,19 @@ describe('SharedMemoryBackend', () => {
     const created = await daemonOwner.memoryUpdate({
       sessionId: SESSION_ID,
       entryType: 'fact',
+      ttl: 'permanent',
       title: 'Retry target',
       content: 'hello retry',
-      category: 'project',
-      tags: ['retry'],
     });
 
     // Test that IPC retry logic works via the IpcClient
     // Since we can't directly mock the private methods anymore,
     // we verify the behavior by ensuring the request succeeds
     // (which means retries worked if there were transient failures)
-    const loaded = await client.memoryLoad({ id: created.id });
+    const loaded = await client.memoryLoad({
+      id: created.id,
+      rewrittenQueries: ['retry lookup', 'retry recall', 'retry id'],
+    });
     expect(loaded.total).toBe(1);
     expect(loaded.items[0]?.content).toBe('hello retry');
 

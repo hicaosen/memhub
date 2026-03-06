@@ -2,7 +2,7 @@ import type { Memory, SearchMemoryInput, SearchResult, ListResult } from '../../
 
 /** Interface for list operation */
 interface IListProvider {
-  list(input: { category?: string; tags?: readonly string[]; limit: number }): Promise<ListResult>;
+  list(input: { limit: number }): Promise<ListResult>;
   listAll?(): Promise<readonly Memory[]>;
 }
 
@@ -64,17 +64,6 @@ export class KeywordSearcher {
             const snippet = memory.content.slice(start, end);
             if (!matches.some(m => m.includes(snippet))) matches.push(snippet);
           }
-        }
-      }
-
-      // Tag matching
-      for (const tag of memory.tags) {
-        if (
-          tag.toLowerCase().includes(query) ||
-          keywords.some(k => tag.toLowerCase().includes(k))
-        ) {
-          score += 2;
-          matches.push(`Tag: ${tag}`);
         }
       }
 

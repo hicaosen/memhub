@@ -14,9 +14,7 @@ function makeMemory(partial: Partial<Memory>): Memory {
     id: partial.id ?? '550e8400-e29b-41d4-a716-446655440000',
     createdAt: partial.createdAt ?? new Date('2026-03-01T00:00:00.000Z').toISOString(),
     updatedAt: partial.updatedAt ?? new Date('2026-03-04T10:40:00.000Z').toISOString(),
-    category: partial.category ?? 'general',
     importance: partial.importance ?? 3,
-    tags: partial.tags ?? [],
     title: partial.title ?? '',
     content: partial.content ?? '',
   };

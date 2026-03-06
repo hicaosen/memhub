@@ -233,6 +233,6 @@ export class WALError extends Error {
  */
 export function createWALStorage(storagePath: string): WALStorage {
   return new WALStorage({
-    walPath: join(storagePath, '.memhub', WAL_FILENAME),
+    walPath: join(storagePath, 'wal', WAL_FILENAME),
   });
 }

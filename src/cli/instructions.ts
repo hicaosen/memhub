@@ -1,6 +1,6 @@
 /**
  * MemHub instructions generator
- * Generates agent-specific instruction content with versioned tags
+ * Generates agent-specific instruction content with versioned markers
  */
 
 import type { AgentConfig } from './types.js';
@@ -61,7 +61,7 @@ MemHub is a Git-friendly memory system for storing decisions, preferences, and r
 
 1. **Load on demand** - Call memory_load at task start to get context
 2. **Store timely** - Call memory_update when learning valuable information
-3. **Query precisely** - Use tags to filter relevant memories
+3. **Query precisely** - Use focused queries to retrieve relevant memories
 4. **Describe concisely** - Be specific in content, helpful in title
 
 ### Memory Types

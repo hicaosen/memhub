@@ -13,7 +13,7 @@ import type { MemoryUpdateInput, MemoryUpdateOutput } from '../../../src/contrac
 // ── helpers ────────────────────────────────────────────────────────────────
 
 function makeInput(overrides: Partial<MemoryUpdateInput> = {}): MemoryUpdateInput {
-  return { mode: 'append', content: 'hello', ...overrides };
+  return { mode: 'append', content: 'hello', ttl: 'permanent', ...overrides };
 }
 
 function makeOutput(id = 'test-id'): MemoryUpdateOutput {
@@ -29,8 +29,6 @@ function makeOutput(id = 'test-id'): MemoryUpdateOutput {
       content: 'hello',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      tags: [],
-      category: 'general',
       importance: 3,
     },
   };
@@ -60,21 +58,9 @@ describe('FileIdempotencyStore', () => {
       expect(fp1).not.toBe(fp2);
     });
 
-    it('should produce different fingerprints when ttl is present vs absent', () => {
-      const fpWithTtl = store.computeFingerprint(makeInput({ ttl: 'permanent' }));
-      const fpNoTtl = store.computeFingerprint(makeInput());
-      expect(fpWithTtl).not.toBe(fpNoTtl);
-    });
-
     it('should produce the same fingerprint for identical ttl values', () => {
       const fp1 = store.computeFingerprint(makeInput({ ttl: 'long' }));
       const fp2 = store.computeFingerprint(makeInput({ ttl: 'long' }));
-      expect(fp1).toBe(fp2);
-    });
-
-    it('should treat undefined ttl and no-ttl as equivalent', () => {
-      const fp1 = store.computeFingerprint(makeInput({ ttl: undefined }));
-      const fp2 = store.computeFingerprint(makeInput());
       expect(fp1).toBe(fp2);
     });
   });

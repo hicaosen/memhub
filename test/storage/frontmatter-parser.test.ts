@@ -19,10 +19,6 @@ describe('parseFrontMatter', () => {
 id: "550e8400-e29b-41d4-a716-446655440000"
 created_at: "2024-03-15T10:30:00Z"
 updated_at: "2024-03-15T14:20:00Z"
-tags:
-  - project
-  - meeting
-category: "work"
 importance: 4
 ---
 
@@ -38,19 +34,16 @@ This is the meeting content.
 
     const result = parseFrontMatter(markdown);
     expect(result.frontMatter.id).toBe('550e8400-e29b-41d4-a716-446655440000');
-    expect(result.frontMatter.category).toBe('work');
     expect(result.frontMatter.importance).toBe(4);
     expect(result.title).toBe('Project Meeting');
     expect(result.content).toContain('Action Items');
   });
 
-  it('should parse front matter with empty tags', () => {
+  it('should parse front matter with required fields', () => {
     const markdown = `---
 id: "550e8400-e29b-41d4-a716-446655440000"
 created_at: "2024-03-15T10:30:00Z"
 updated_at: "2024-03-15T10:30:00Z"
-tags: []
-category: "general"
 importance: 3
 ---
 
@@ -60,7 +53,7 @@ Content here.
 `;
 
     const result = parseFrontMatter(markdown);
-    expect(result.frontMatter.tags).toEqual([]);
+    expect(result.frontMatter.importance).toBe(3);
   });
 
   it('should throw error for missing front matter', () => {
@@ -106,8 +99,6 @@ Content.
 id: "550e8400-e29b-41d4-a716-446655440000"
 created_at: "2024-03-15T10:30:00Z"
 updated_at: "2024-03-15T10:30:00Z"
-tags: []
-category: "general"
 importance: 3
 ---
 
@@ -130,8 +121,6 @@ describe('stringifyFrontMatter', () => {
     id: '550e8400-e29b-41d4-a716-446655440000',
     created_at: '2024-03-15T10:30:00Z',
     updated_at: '2024-03-15T14:20:00Z',
-    tags: ['project', 'meeting'],
-    category: 'work',
     importance: 4,
   };
 
@@ -143,13 +132,6 @@ describe('stringifyFrontMatter', () => {
     expect(result).toContain('Content here');
   });
 
-  it('should format tags as YAML array', () => {
-    const result = stringifyFrontMatter(frontMatter, 'Title', 'Content');
-    expect(result).toContain('tags:');
-    expect(result).toContain('project');
-    expect(result).toContain('meeting');
-  });
-
   it('should use LF line endings', () => {
     const result = stringifyFrontMatter(frontMatter, 'Title', 'Content');
     expect(result).not.toContain('\r\n');
@@ -159,12 +141,6 @@ describe('stringifyFrontMatter', () => {
   it('should add blank line between front matter and content', () => {
     const result = stringifyFrontMatter(frontMatter, 'Title', 'Content');
     expect(result).toMatch(/---\n\n# Title/);
-  });
-
-  it('should handle empty tags', () => {
-    const fmWithEmptyTags: MemoryFrontMatter = { ...frontMatter, tags: [] };
-    const result = stringifyFrontMatter(fmWithEmptyTags, 'Title', 'Content');
-    expect(result).toContain('tags: []');
   });
 
   it('should handle multiline content', () => {
@@ -182,8 +158,6 @@ describe('memoryToFrontMatter', () => {
       id: '550e8400-e29b-41d4-a716-446655440000',
       createdAt: '2024-03-15T10:30:00Z',
       updatedAt: '2024-03-15T14:20:00Z',
-      tags: ['test'],
-      category: 'work',
       importance: 3,
       title: 'Test',
       content: 'Content',
@@ -193,8 +167,6 @@ describe('memoryToFrontMatter', () => {
     expect(result.id).toBe(memory.id);
     expect(result.created_at).toBe(memory.createdAt);
     expect(result.updated_at).toBe(memory.updatedAt);
-    expect(result.tags).toEqual(memory.tags);
-    expect(result.category).toBe(memory.category);
     expect(result.importance).toBe(memory.importance);
   });
 });
@@ -205,8 +177,6 @@ describe('frontMatterToMemory', () => {
       id: '550e8400-e29b-41d4-a716-446655440000',
       created_at: '2024-03-15T10:30:00Z',
       updated_at: '2024-03-15T14:20:00Z',
-      tags: ['test'],
-      category: 'work',
       importance: 3,
     };
 
@@ -214,8 +184,6 @@ describe('frontMatterToMemory', () => {
     expect(result.id).toBe(fm.id);
     expect(result.createdAt).toBe(fm.created_at);
     expect(result.updatedAt).toBe(fm.updated_at);
-    expect(result.tags).toEqual(fm.tags);
-    expect(result.category).toBe(fm.category);
     expect(result.importance).toBe(fm.importance);
     expect(result.title).toBe('Title');
     expect(result.content).toBe('Content');

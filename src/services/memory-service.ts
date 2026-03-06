@@ -123,7 +123,7 @@ export class MemoryService implements VectorIndexScheduler {
     // Initialize idempotency store
     const idempotencyFilePath = join(
       config.storagePath,
-      '.memhub-idempotency',
+      'idempotency',
       'memory-update-index.json'
     );
     this.idempotencyStore = new FileIdempotencyStore(idempotencyFilePath);
@@ -529,8 +529,6 @@ export class MemoryService implements VectorIndexScheduler {
           expiresAt,
           sessionId,
           entryType: input.entryType,
-          tags: [],
-          category: 'general',
           importance: input.importance ?? 3,
           title: input.title ?? 'memory note',
           content: input.content,

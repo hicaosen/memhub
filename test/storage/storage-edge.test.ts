@@ -40,8 +40,6 @@ describe('MarkdownStorage Edge Cases', () => {
         id: '550e8400-e29b-41d4-a716-446655440000',
         createdAt: '2024-03-15T10:30:00Z',
         updatedAt: '2024-03-15T10:30:00Z',
-        tags: [],
-        category: 'test',
         importance: 3,
         title: '',
         content: 'Content with empty title',
@@ -56,8 +54,6 @@ describe('MarkdownStorage Edge Cases', () => {
         id: '550e8400-e29b-41d4-a716-446655440001',
         createdAt: '2024-03-15T10:30:00Z',
         updatedAt: '2024-03-15T10:30:00Z',
-        tags: [],
-        category: 'test',
         importance: 3,
         title: 'Title with @#$%^&*()',
         content: 'Content',
@@ -72,8 +68,6 @@ describe('MarkdownStorage Edge Cases', () => {
         id: '550e8400-e29b-41d4-a716-446655440002',
         createdAt: '2024-03-15T10:30:00Z',
         updatedAt: '2024-03-15T10:30:00Z',
-        tags: [],
-        category: 'test',
         importance: 3,
         title: 'Long Content',
         content: 'A'.repeat(10000),
@@ -106,8 +100,6 @@ describe('MarkdownStorage Edge Cases', () => {
 id: "550e8400-e29b-41d4-a716-446655440000"
 created_at: "2024-03-15T10:30:00Z"
 updated_at: "2024-03-15T10:30:00Z"
-tags: []
-category: "general"
 importance: 3
 ---
 
@@ -128,8 +120,6 @@ Just some content without H1.
 id: "valid-id"
 created_at: "2024-03-15T10:30:00Z"
 updated_at: "2024-03-15T10:30:00Z"
-tags: []
-category: "general"
 importance: 3
 ---
 
@@ -176,8 +166,6 @@ importance: 3
 id: "id-1"
 created_at: "2024-03-15T10:30:00Z"
 updated_at: "2024-03-15T10:30:00Z"
-tags: []
-category: "general"
 importance: 3
 ---
 
@@ -187,8 +175,6 @@ importance: 3
 id: "id-2"
 created_at: "2024-03-15T10:30:00Z"
 updated_at: "2024-03-15T10:30:00Z"
-tags: []
-category: "general"
 importance: 3
 ---
 

@@ -53,33 +53,9 @@ describe('MemoryService Edge Cases', () => {
       expect(result.memory.title).toBe('Title with @#$%^&*() special chars!');
     });
 
-    it('should handle many tags', async () => {
-      const tags = Array.from({ length: 20 }, (_, i) => `tag${i}`);
-      const result = await memoryService.create({
-        title: 'Many Tags',
-        content: 'Content',
-        tags,
-      });
-      expect(result.memory.tags).toHaveLength(20);
-    });
   });
 
   describe('update edge cases', () => {
-    it('should update only tags', async () => {
-      const created = await memoryService.create({
-        title: 'Title',
-        content: 'Content',
-        tags: ['old'],
-      });
-      const updated = await memoryService.update({
-        id: created.id,
-        tags: ['new1', 'new2'],
-      });
-      expect(updated.memory.tags).toEqual(['new1', 'new2']);
-      expect(updated.memory.title).toBe('Title');
-      expect(updated.memory.content).toBe('Content');
-    });
-
     it('should update only importance', async () => {
       const created = await memoryService.create({
         title: 'Title',
@@ -93,18 +69,6 @@ describe('MemoryService Edge Cases', () => {
       expect(updated.memory.importance).toBe(5);
     });
 
-    it('should update only category', async () => {
-      const created = await memoryService.create({
-        title: 'Title',
-        content: 'Content',
-        category: 'old-category',
-      });
-      const updated = await memoryService.update({
-        id: created.id,
-        category: 'new-category',
-      });
-      expect(updated.memory.category).toBe('new-category');
-    });
   });
 
   describe('list with various filters', () => {
@@ -117,8 +81,6 @@ describe('MemoryService Edge Cases', () => {
         await memoryService.create({
           title: `Memory ${i}`,
           content: 'Content',
-          category: i % 2 === 0 ? 'even' : 'odd',
-          tags: [`tag${i}`, 'common'],
         });
       }
     });
@@ -140,7 +102,7 @@ describe('MemoryService Edge Cases', () => {
 
     it('should handle empty result with strict filters', async () => {
       const result = await memoryService.list({
-        category: 'non-existent',
+        fromDate: '3024-01-01T00:00:00.000Z',
       });
       expect(result.memories).toHaveLength(0);
       expect(result.total).toBe(0);
@@ -185,12 +147,10 @@ describe('MemoryService Edge Cases', () => {
       await memoryService.create({
         title: 'Project Alpha',
         content: 'This is about the alpha project development.',
-        tags: ['alpha', 'dev'],
       });
       await memoryService.create({
         title: 'Project Beta',
         content: 'Beta testing is in progress.',
-        tags: ['beta', 'testing'],
       });
     });
 
@@ -214,7 +174,6 @@ describe('MemoryService Edge Cases', () => {
       await memoryService.create({
         title: 'Project Planning',
         content: 'plan timeline and resources',
-        tags: ['planning'],
       });
 
       (
@@ -236,7 +195,6 @@ describe('MemoryService Edge Cases', () => {
       await memoryService.create({
         title: 'Meeting Notes',
         content: 'Discussed project requirements.',
-        tags: ['meeting'],
       });
 
       (
@@ -261,10 +219,9 @@ describe('MemoryService Edge Cases', () => {
         sessionId: '550e8400-e29b-41d4-a716-446655440123',
         idempotencyKey: 'idem-replay-1',
         entryType: 'fact' as const,
+        ttl: 'permanent' as const,
         title: 'Idempotent write',
         content: 'should only be written once',
-        category: 'project',
-        tags: ['idempotent'],
       };
 
       const first = await memoryService.memoryUpdate(input);
@@ -274,7 +231,10 @@ describe('MemoryService Edge Cases', () => {
       expect(second.filePath).toBe(first.filePath);
       expect(second.idempotentReplay).toBe(true);
 
-      const loaded = await memoryService.memoryLoad({ id: first.id });
+      const loaded = await memoryService.memoryLoad({
+        id: first.id,
+        rewrittenQueries: ['id lookup', 'id recall', 'id exact'],
+      });
       expect(loaded.total).toBe(1);
       expect(loaded.items[0]?.content).toBe('should only be written once');
     });
@@ -283,6 +243,7 @@ describe('MemoryService Edge Cases', () => {
       await memoryService.memoryUpdate({
         idempotencyKey: 'idem-conflict-1',
         entryType: 'fact',
+        ttl: 'permanent',
         title: 'Original',
         content: 'original content',
       });
@@ -291,6 +252,7 @@ describe('MemoryService Edge Cases', () => {
         memoryService.memoryUpdate({
           idempotencyKey: 'idem-conflict-1',
           entryType: 'fact',
+          ttl: 'permanent',
           title: 'Original',
           content: 'changed content',
         })

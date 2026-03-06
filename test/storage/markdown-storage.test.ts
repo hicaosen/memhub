@@ -29,8 +29,6 @@ describe('MarkdownStorage', () => {
       createdAt: '2024-03-15T10:30:00Z',
       updatedAt: '2024-03-15T10:30:00Z',
       sessionId: '550e8400-e29b-41d4-a716-446655440999',
-      tags: ['test', 'memory'],
-      category: 'testing',
       importance: 3,
       title: 'Test Memory',
       content: 'This is the content of the test memory.',
@@ -59,14 +57,6 @@ describe('MarkdownStorage', () => {
       expect(content).toContain('This is the content');
     });
 
-    it('should write tags as YAML array', async () => {
-      const filePath = await storage.write(sampleMemory);
-      const content = readFileSync(filePath, 'utf-8');
-      expect(content).toContain('tags:');
-      expect(content).toContain('test');
-      expect(content).toContain('memory');
-    });
-
     it('should return nested file path', async () => {
       const result = await storage.write(sampleMemory);
       expect(result).toContain('test-memory.md');
@@ -82,9 +72,6 @@ describe('MarkdownStorage', () => {
 id: "550e8400-e29b-41d4-a716-446655440000"
 created_at: "2024-03-15T10:30:00Z"
 updated_at: "2024-03-15T10:30:00Z"
-tags:
-  - test
-category: "testing"
 importance: 3
 ---
 
@@ -113,10 +100,6 @@ This is the content.
 id: "550e8400-e29b-41d4-a716-446655440000"
 created_at: "2024-03-15T10:30:00Z"
 updated_at: "2024-03-15T14:20:00Z"
-tags:
-  - tag1
-  - tag2
-category: "work"
 importance: 4
 ---
 
@@ -128,8 +111,6 @@ Test content.
       writeFileSync(join(tempDir, 'test.md'), testContent);
 
       const memory = await storage.read('550e8400-e29b-41d4-a716-446655440000');
-      expect(memory.tags).toEqual(['tag1', 'tag2']);
-      expect(memory.category).toBe('work');
       expect(memory.importance).toBe(4);
     });
   });
@@ -141,8 +122,6 @@ Test content.
 id: "550e8400-e29b-41d4-a716-446655440000"
 created_at: "2024-03-15T10:30:00Z"
 updated_at: "2024-03-15T10:30:00Z"
-tags: []
-category: "general"
 importance: 3
 ---
 
@@ -168,11 +147,11 @@ importance: 3
       const { writeFileSync } = await import('fs');
       writeFileSync(
         join(tempDir, '2024-03-15-a.md'),
-        '---\nid: "a"\ncreated_at: "2024-03-15T10:30:00Z"\nupdated_at: "2024-03-15T10:30:00Z"\ntags: []\ncategory: "general"\nimportance: 3\n---\n\n# A'
+        '---\nid: "a"\ncreated_at: "2024-03-15T10:30:00Z"\nupdated_at: "2024-03-15T10:30:00Z"\nimportance: 3\n---\n\n# A'
       );
       writeFileSync(
         join(tempDir, '2024-03-16-b.md'),
-        '---\nid: "b"\ncreated_at: "2024-03-16T10:30:00Z"\nupdated_at: "2024-03-16T10:30:00Z"\ntags: []\ncategory: "general"\nimportance: 3\n---\n\n# B'
+        '---\nid: "b"\ncreated_at: "2024-03-16T10:30:00Z"\nupdated_at: "2024-03-16T10:30:00Z"\nimportance: 3\n---\n\n# B'
       );
 
       const files = await storage.list();
@@ -188,7 +167,7 @@ importance: 3
       const { writeFileSync } = await import('fs');
       writeFileSync(
         join(tempDir, 'test.md'),
-        '---\nid: "test"\ncreated_at: "2024-03-15T10:30:00Z"\nupdated_at: "2024-03-15T10:30:00Z"\ntags: []\ncategory: "general"\nimportance: 3\n---\n\n# Test'
+        '---\nid: "test"\ncreated_at: "2024-03-15T10:30:00Z"\nupdated_at: "2024-03-15T10:30:00Z"\nimportance: 3\n---\n\n# Test'
       );
       writeFileSync(join(tempDir, 'test.txt'), 'not markdown');
 
@@ -204,8 +183,6 @@ importance: 3
 id: "550e8400-e29b-41d4-a716-446655440000"
 created_at: "2024-03-15T10:30:00Z"
 updated_at: "2024-03-15T10:30:00Z"
-tags: []
-category: "general"
 importance: 3
 ---
 
@@ -234,8 +211,6 @@ importance: 3
       createdAt: '2024-06-01T12:00:00.000Z',
       updatedAt: '2024-06-01T12:00:00.000Z',
       sessionId: '550e8400-e29b-41d4-a716-446655440999',
-      tags: [],
-      category: 'general',
       importance: 3,
       title: 'Cache Test',
       content: 'testing cache',
@@ -275,7 +250,7 @@ importance: 3
       const externalPath = join(dir, 'external.md');
       writeFileSync(
         externalPath,
-        `---\nid: "${MEM_ID}"\ncreated_at: "2024-06-01T12:00:00.000Z"\nupdated_at: "2024-06-01T12:00:00.000Z"\ntags: []\ncategory: "general"\nimportance: 3\n---\n\n# Cache Test\n`
+        `---\nid: "${MEM_ID}"\ncreated_at: "2024-06-01T12:00:00.000Z"\nupdated_at: "2024-06-01T12:00:00.000Z"\nimportance: 3\n---\n\n# Cache Test\n`
       );
 
       // cache is empty — must fall back to disk scan

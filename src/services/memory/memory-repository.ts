@@ -91,8 +91,6 @@ export class MemoryRepository {
       createdAt: now,
       updatedAt: now,
       expiresAt,
-      tags: input.tags ?? [],
-      category: input.category ?? 'general',
       importance: input.importance ?? 3,
       title: input.title,
       content: input.content,
@@ -168,8 +166,6 @@ export class MemoryRepository {
       expiresAt,
       ...(input.title !== undefined && { title: input.title }),
       ...(input.content !== undefined && { content: input.content }),
-      ...(input.tags !== undefined && { tags: input.tags }),
-      ...(input.category !== undefined && { category: input.category }),
       ...(input.importance !== undefined && { importance: input.importance }),
       ...(ttl !== undefined && { ttl }),
     };
@@ -227,12 +223,6 @@ export class MemoryRepository {
         }
       }
 
-      if (input.category) {
-        memories = memories.filter(m => m.category === input.category);
-      }
-      if (input.tags && input.tags.length > 0) {
-        memories = memories.filter(m => input.tags!.every(tag => m.tags.includes(tag)));
-      }
       if (input.fromDate) {
         memories = memories.filter(m => m.createdAt >= input.fromDate!);
       }

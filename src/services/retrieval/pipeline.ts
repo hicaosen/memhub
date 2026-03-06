@@ -48,18 +48,10 @@ function scoreKeywordMatch(
       );
       matches.push(snippet);
     }
-    for (const tag of memory.tags) {
-      if (tag.toLowerCase().includes(variant)) {
-        score += 0.2;
-        matches.push(`Tag: ${tag}`);
-      }
-    }
   }
 
   const queryTokens = new Set(variants.flatMap(tokenize));
-  const memoryTokens = new Set(
-    tokenize(`${memory.title} ${memory.content} ${(memory.tags ?? []).join(' ')}`)
-  );
+  const memoryTokens = new Set(tokenize(`${memory.title} ${memory.content}`));
   let overlap = 0;
   for (const token of queryTokens) {
     if (memoryTokens.has(token)) overlap += 1;

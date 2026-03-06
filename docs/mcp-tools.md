@@ -13,7 +13,7 @@ Load relevant memories to get context for the current task.
 | Parameter   | Type     | Required | Description                                                 |
 | ----------- | -------- | -------- | ----------------------------------------------------------- |
 | `query`     | string   | No       | Search query to filter memories                             |
-| `tags`      | string[] | No       | Filter by tags                                              |
+| `rewrittenQueries` | string[] | Yes | Exactly 3 rewritten queries for retrieval expansion        |
 | `limit`     | number   | No       | Max memories to return (default: 10)                        |
 | `entryType` | string   | No       | Filter by type: `preference`, `decision`, `context`, `fact` |
 
@@ -26,8 +26,6 @@ Load relevant memories to get context for the current task.
       "id": "uuid",
       "title": "Memory title",
       "content": "Memory content...",
-      "tags": ["tag1", "tag2"],
-      "category": "engineering",
       "importance": 4,
       "createdAt": "2026-03-04T10:00:00.000Z",
       "updatedAt": "2026-03-04T10:00:00.000Z"
@@ -49,7 +47,7 @@ Load relevant memories to get context for the current task.
 ```json
 {
   "query": "testing framework",
-  "tags": ["preference"],
+  "rewrittenQueries": ["testing framework", "preferred testing tool", "test stack preference"],
   "limit": 5
 }
 ```
@@ -66,10 +64,9 @@ Store new memories or update existing ones.
 | ---------------- | -------- | -------- | ---------------------------------------------------- |
 | `title`          | string   | Yes      | Short, descriptive title                             |
 | `content`        | string   | Yes      | Detailed memory content                              |
+| `ttl`            | string   | Yes      | TTL policy: `permanent`/`long`/`medium`/`short`/`session` |
 | `idempotencyKey` | string   | No       | Client-generated retry key to avoid duplicate writes |
-| `tags`           | string[] | No       | Tags for categorization                              |
 | `entryType`      | string   | No       | Memory type (default: `fact`)                        |
-| `category`       | string   | No       | Category (e.g., `engineering`, `business`)           |
 | `importance`     | number   | No       | Importance 1-5 (default: 3)                          |
 | `id`             | string   | No       | Existing memory ID to update                         |
 
@@ -112,7 +109,7 @@ Store new memories or update existing ones.
 {
   "title": "Use Vitest for Testing",
   "content": "User prefers Vitest over Jest for all new projects. Reason: faster test execution and better ESM support.",
-  "tags": ["testing", "preference"],
+  "ttl": "permanent",
   "entryType": "preference",
   "importance": 4
 }

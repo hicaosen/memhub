@@ -83,7 +83,15 @@ Call this early to provide personalized, context-aware responses.`,
           type: 'number',
           description: 'Max results (default: 20, max: 100)',
         },
+        rewrittenQueries: {
+          type: 'array',
+          description: 'Three query rewrites for recall expansion',
+          minItems: 3,
+          maxItems: 3,
+          items: { type: 'string' },
+        },
       },
+      required: ['rewrittenQueries'],
       additionalProperties: false,
     },
   },
@@ -190,6 +198,7 @@ export type ToolInput<T extends ToolName> = T extends 'memory_load'
   ? {
       id?: string;
       query?: string;
+      rewrittenQueries: [string, string, string];
       limit?: number;
     }
   : T extends 'memory_update'

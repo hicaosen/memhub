@@ -117,10 +117,9 @@ describe('McpServer (SDK)', () => {
       const input = MemoryUpdateInputV2Schema.parse({
         sessionId: '550e8400-e29b-41d4-a716-446655440000',
         entryType: 'decision',
+        ttl: 'permanent',
         title: 'Test decision',
         content: 'This is a test decision',
-        tags: ['test'],
-        category: 'general',
       });
 
       const result = await memoryService.memoryUpdate(input);
@@ -136,10 +135,9 @@ describe('McpServer (SDK)', () => {
       const updateInput = MemoryUpdateInputV2Schema.parse({
         sessionId: '550e8400-e29b-41d4-a716-446655440001',
         entryType: 'preference',
+        ttl: 'permanent',
         title: 'Test preference',
         content: 'I prefer chocolate ice cream',
-        tags: ['food', 'preference'],
-        category: 'personal',
       });
 
       const updateResult = await memoryService.memoryUpdate(updateInput);
@@ -147,6 +145,7 @@ describe('McpServer (SDK)', () => {
       // Then load it
       const loadInput = MemoryLoadInputSchema.parse({
         id: updateResult.id,
+        rewrittenQueries: ['id lookup', 'id recall', 'id exact'],
       });
 
       const loadResult = await memoryService.memoryLoad(loadInput);
@@ -165,6 +164,7 @@ describe('McpServer (SDK)', () => {
     it('should validate memory_load input schema', () => {
       const validInput = MemoryLoadInputSchema.parse({
         query: 'test query',
+        rewrittenQueries: ['test query', 'query test', 'search test'],
         limit: 10,
         intents: {
           primary: 'semantic',

@@ -29,7 +29,7 @@ describe('JsonFileLogger', () => {
 
     await logger.info('memory_load.start', 'start load', {
       requestId: 'req-1',
-      meta: { content: 'secret', category: 'project' },
+      meta: { content: 'secret', note: 'project' },
     });
 
     await logger.error('memory_load.fail', 'failed load', {

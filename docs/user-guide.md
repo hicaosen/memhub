@@ -108,10 +108,6 @@ Memories are plain Markdown files with YAML front matter:
 ---
 id: '550e8400-e29b-41d4-a716-446655440000'
 created_at: '2026-03-04T10:00:00.000Z'
-tags:
-  - architecture
-  - tdd
-category: 'engineering'
 importance: 4
 ---
 

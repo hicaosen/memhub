@@ -22,20 +22,6 @@ export const SlugSchema = z
   .max(100)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Must be a valid URL slug');
 
-/** Tag name validation */
-export const TagSchema = z
-  .string()
-  .min(1)
-  .max(50)
-  .regex(/^[a-z0-9-]+$/, 'Tags can only contain lowercase letters, numbers, and hyphens');
-
-/** Category name validation */
-export const CategorySchema = z
-  .string()
-  .min(1)
-  .max(50)
-  .regex(/^[a-z0-9-]+$/, 'Category can only contain lowercase letters, numbers, and hyphens');
-
 /** Importance level validation (1-5) */
 export const ImportanceSchema = z.number().int().min(1).max(5);
 
@@ -70,8 +56,6 @@ export const MemoryFrontMatterSchema = z.object({
   session_id: UUIDSchema.optional(),
   entry_type: MemoryEntryTypeSchema.optional(),
   ttl: TTLLevelSchema.optional(),
-  tags: z.array(TagSchema).readonly().default([]),
-  category: CategorySchema.default('general'),
   importance: ImportanceSchema.default(3),
 });
 
@@ -84,8 +68,6 @@ export const MemorySchema = z.object({
   sessionId: UUIDSchema.optional(),
   entryType: MemoryEntryTypeSchema.optional(),
   ttl: TTLLevelSchema.optional(),
-  tags: z.array(z.string()).readonly(),
-  category: CategorySchema,
   importance: ImportanceSchema,
   title: z.string().min(1).max(200),
   content: z.string().max(100000),
@@ -147,8 +129,6 @@ export const SortOrderSchema = z.enum(['asc', 'desc']);
 
 /** Memory filter schema */
 export const MemoryFilterSchema = z.object({
-  category: CategorySchema.optional(),
-  tags: z.array(TagSchema).readonly().optional(),
   fromDate: ISO8601TimestampSchema.optional(),
   toDate: ISO8601TimestampSchema.optional(),
 });
@@ -174,8 +154,6 @@ export const CreateMemoryInputSchema = z.object({
   ttl: TTLLevelSchema.optional(),
   title: z.string().min(1).max(200),
   content: z.string().max(100000),
-  tags: z.array(TagSchema).readonly().default([]),
-  category: CategorySchema.default('general'),
   importance: ImportanceSchema.default(3),
 });
 
@@ -190,8 +168,6 @@ export const UpdateMemoryInputSchema = z.object({
   id: UUIDSchema,
   title: z.string().min(1).max(200).optional(),
   content: z.string().max(100000).optional(),
-  tags: z.array(TagSchema).readonly().optional(),
-  category: CategorySchema.optional(),
   importance: ImportanceSchema.optional(),
 });
 
@@ -202,8 +178,6 @@ export const DeleteMemoryInputSchema = z.object({
 
 /** List memory input schema */
 export const ListMemoryInputSchema = z.object({
-  category: CategorySchema.optional(),
-  tags: z.array(TagSchema).readonly().optional(),
   fromDate: ISO8601TimestampSchema.optional(),
   toDate: ISO8601TimestampSchema.optional(),
   limit: z.number().int().min(1).max(100).optional(),
@@ -231,7 +205,7 @@ export const MemoryLoadInputSchema = z.object({
       fallbacks: z.tuple([RetrievalIntentSchema, RetrievalIntentSchema]),
     })
     .optional(),
-  rewrittenQueries: z.tuple([z.string(), z.string(), z.string()]).optional(),
+  rewrittenQueries: z.tuple([z.string(), z.string(), z.string()]),
   limit: z.number().int().min(1).max(100).default(10),
 });
 
@@ -247,7 +221,7 @@ export const MemoryUpdateInputV2Schema = z.object({
     .optional(),
   mode: z.enum(['append', 'upsert']).default('append'),
   entryType: MemoryEntryTypeSchema.optional(),
-  ttl: TTLLevelSchema.optional(),
+  ttl: TTLLevelSchema,
   title: z.string().min(1).max(200).optional(),
   content: z.string().min(1).max(100000),
   importance: ImportanceSchema.optional(),
@@ -293,16 +267,6 @@ export const ListMemoryOutputSchema = ListResultSchema;
 export const SearchMemoryOutputSchema = z.object({
   results: z.array(SearchResultSchema).readonly(),
   total: z.number().int().nonnegative(),
-});
-
-/** Get categories output schema */
-export const GetCategoriesOutputSchema = z.object({
-  categories: z.array(CategorySchema).readonly(),
-});
-
-/** Get tags output schema */
-export const GetTagsOutputSchema = z.object({
-  tags: z.array(TagSchema).readonly(),
 });
 
 // ============================================================================
@@ -362,8 +326,6 @@ export type MemoryUpdateOutput = z.infer<typeof MemoryUpdateOutputSchema>;
 export type DeleteMemoryOutput = z.infer<typeof DeleteMemoryOutputSchema>;
 export type ListMemoryOutput = z.infer<typeof ListMemoryOutputSchema>;
 export type SearchMemoryOutput = z.infer<typeof SearchMemoryOutputSchema>;
-export type GetCategoriesOutput = z.infer<typeof GetCategoriesOutputSchema>;
-export type GetTagsOutput = z.infer<typeof GetTagsOutputSchema>;
 
 // Configuration type
 export type Config = z.infer<typeof ConfigSchema>;

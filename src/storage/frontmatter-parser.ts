@@ -36,8 +36,6 @@ export class FrontMatterError extends Error {
  * id: "uuid"
  * created_at: "ISO8601"
  * updated_at: "ISO8601"
- * tags: ["tag1", "tag2"]
- * category: "category"
  * importance: 3
  * ---
  *
@@ -109,8 +107,6 @@ export function stringifyFrontMatter(
     ...(frontMatter.session_id ? { session_id: frontMatter.session_id } : {}),
     ...(frontMatter.entry_type ? { entry_type: frontMatter.entry_type } : {}),
     ...(frontMatter.ttl ? { ttl: frontMatter.ttl } : {}),
-    tags: frontMatter.tags.length > 0 ? frontMatter.tags : [],
-    category: frontMatter.category,
     importance: frontMatter.importance,
   };
 
@@ -188,8 +184,6 @@ function isValidFrontMatter(value: unknown): value is MemoryFrontMatter {
   if (typeof fm.updated_at !== 'string') return false;
   if (fm.session_id !== undefined && typeof fm.session_id !== 'string') return false;
   if (fm.entry_type !== undefined && typeof fm.entry_type !== 'string') return false;
-  if (!Array.isArray(fm.tags)) return false;
-  if (typeof fm.category !== 'string') return false;
   if (typeof fm.importance !== 'number') return false;
 
   return true;
@@ -210,8 +204,6 @@ export function memoryToFrontMatter(memory: Memory): MemoryFrontMatter {
     session_id: memory.sessionId,
     entry_type: memory.entryType,
     ttl: memory.ttl,
-    tags: memory.tags,
-    category: memory.category,
     importance: memory.importance,
   };
 }
@@ -237,8 +229,6 @@ export function frontMatterToMemory(
     sessionId: frontMatter.session_id,
     entryType: frontMatter.entry_type,
     ttl: frontMatter.ttl,
-    tags: frontMatter.tags,
-    category: frontMatter.category,
     importance: frontMatter.importance,
     title,
     content,

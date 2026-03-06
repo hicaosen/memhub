@@ -8,8 +8,6 @@ function makeMemory(partial: Partial<Memory>): Memory {
     id: partial.id ?? '550e8400-e29b-41d4-a716-446655440000',
     createdAt: partial.createdAt ?? now,
     updatedAt: partial.updatedAt ?? now,
-    tags: partial.tags ?? [],
-    category: partial.category ?? 'general',
     importance: partial.importance ?? 3,
     title: partial.title ?? 'title',
     content: partial.content ?? 'content',
@@ -24,8 +22,6 @@ describe('VectorRetrieverAdapter', () => {
     const memory = makeMemory({
       id: '550e8400-e29b-41d4-a716-446655440001',
       title: 'Schedule',
-      category: 'work',
-      tags: ['schedule'],
     });
 
     const adapter = new VectorRetrieverAdapter({
@@ -55,38 +51,32 @@ describe('VectorRetrieverAdapter', () => {
   });
 
   it('skips missing memory records', async () => {
-    const inCategory = makeMemory({
+    const first = makeMemory({
       id: '550e8400-e29b-41d4-a716-446655440002',
-      category: 'work',
-      tags: ['focus'],
       title: 'Work note',
     });
-    const wrongCategory = makeMemory({
+    const second = makeMemory({
       id: '550e8400-e29b-41d4-a716-446655440003',
-      category: 'personal',
-      tags: ['focus'],
       title: 'Personal note',
     });
-    const wrongTag = makeMemory({
+    const third = makeMemory({
       id: '550e8400-e29b-41d4-a716-446655440004',
-      category: 'work',
-      tags: ['other'],
       title: 'Wrong tag note',
     });
 
     const memoryById = new Map<string, Memory>([
-      [inCategory.id, inCategory],
-      [wrongCategory.id, wrongCategory],
-      [wrongTag.id, wrongTag],
+      [first.id, first],
+      [second.id, second],
+      [third.id, third],
     ]);
 
     const adapter = new VectorRetrieverAdapter({
       embedding: { embed: async () => [1, 2, 3] },
       vectorIndex: {
         search: async () => [
-          { id: inCategory.id, _distance: 0.4 },
-          { id: wrongCategory.id, _distance: 0.1 },
-          { id: wrongTag.id, _distance: 0.1 },
+          { id: first.id, _distance: 0.4 },
+          { id: second.id, _distance: 0.1 },
+          { id: third.id, _distance: 0.1 },
           { id: '550e8400-e29b-41d4-a716-446655440099', _distance: 0.1 },
         ],
       },
@@ -101,7 +91,7 @@ describe('VectorRetrieverAdapter', () => {
 
     expect(hits).toHaveLength(3);
     expect(hits.map(hit => hit.id)).toEqual(
-      expect.arrayContaining([inCategory.id, wrongCategory.id, wrongTag.id])
+      expect.arrayContaining([first.id, second.id, third.id])
     );
   });
 });

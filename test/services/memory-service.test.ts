@@ -51,8 +51,6 @@ describe('MemoryService', () => {
       const input: CreateMemoryInput = {
         title: 'Test Memory',
         content: 'This is a test memory',
-        tags: ['test', 'memory'],
-        category: 'testing',
         importance: 4,
       };
 
@@ -85,8 +83,6 @@ describe('MemoryService', () => {
       };
 
       const result = await memoryService.create(input);
-      expect(result.memory.tags).toEqual([]);
-      expect(result.memory.category).toBe('general');
       expect(result.memory.importance).toBe(3);
     });
 
@@ -178,16 +174,12 @@ describe('MemoryService', () => {
       await memoryService.create({
         title: 'Work 1',
         content: 'Content',
-        category: 'work',
-        tags: ['project'],
       });
       await memoryService.create({
         title: 'Work 2',
         content: 'Content',
-        category: 'work',
-        tags: ['meeting'],
       });
-      await memoryService.create({ title: 'Personal', content: 'Content', category: 'personal' });
+      await memoryService.create({ title: 'Personal', content: 'Content' });
     });
 
     it('should list all memories', async () => {
@@ -195,18 +187,6 @@ describe('MemoryService', () => {
       expect(result.memories).toHaveLength(3);
       expect(result.total).toBe(3);
       expect(result.hasMore).toBe(false);
-    });
-
-    it('should filter by category', async () => {
-      const result = await memoryService.list({ category: 'work' });
-      expect(result.memories).toHaveLength(2);
-      expect(result.total).toBe(2);
-    });
-
-    it('should filter by tags', async () => {
-      const result = await memoryService.list({ tags: ['project'] });
-      expect(result.memories).toHaveLength(1);
-      expect(result.memories[0].title).toBe('Work 1');
     });
 
     it('should support pagination', async () => {
@@ -226,12 +206,10 @@ describe('MemoryService', () => {
       await memoryService.create({
         title: 'Project Planning',
         content: 'We need to plan the project timeline and resources.',
-        tags: ['planning'],
       });
       await memoryService.create({
         title: 'Meeting Notes',
         content: 'Discussed project requirements and timeline.',
-        tags: ['meeting'],
       });
     });
 
@@ -243,11 +221,6 @@ describe('MemoryService', () => {
 
     it('should search in content', async () => {
       const result = await memoryService.search({ query: 'timeline' });
-      expect(result.results.length).toBeGreaterThan(0);
-    });
-
-    it('should search in tags', async () => {
-      const result = await memoryService.search({ query: 'meeting' });
       expect(result.results.length).toBeGreaterThan(0);
     });
 
@@ -341,8 +314,6 @@ id: 550e8400-e29b-41d4-a716-446655440001
 created_at: 2024-01-01T00:00:00.000Z
 updated_at: 2024-01-01T00:00:00.000Z
 expires_at: 2024-01-02T00:00:00.000Z
-tags: []
-category: general
 importance: 3
 ---
 # Expired Memory
@@ -375,8 +346,6 @@ id: ${expiredId}
 created_at: 2024-01-01T00:00:00.000Z
 updated_at: 2024-01-01T00:00:00.000Z
 expires_at: 2024-01-02T00:00:00.000Z
-tags: []
-category: general
 importance: 3
 ---
 # Expired Memory
@@ -412,8 +381,6 @@ id: 550e8400-e29b-41d4-a716-446655440003
 created_at: 2024-01-01T00:00:00.000Z
 updated_at: 2024-01-01T00:00:00.000Z
 expires_at: 2024-01-02T00:00:00.000Z
-tags: []
-category: general
 importance: 3
 ---
 # Expired Project
@@ -447,6 +414,7 @@ This expired project memory should not appear in search.`;
     it('should support memoryUpdate with TTL on update', async () => {
       const created = await memoryService.memoryUpdate({
         content: 'Original content',
+        ttl: 'permanent',
         title: 'Original',
       });
 

@@ -30,8 +30,6 @@ export interface VectorRow {
   id: string;
   vector: number[];
   title: string;
-  category: string;
-  tags: string; // JSON-serialised string[]
   importance: number;
   createdAt: string;
   updatedAt: string;
@@ -111,8 +109,6 @@ export class VectorIndex {
       id: '__init__',
       vector: new Array(VECTOR_DIM).fill(0) as number[],
       title: '',
-      category: '',
-      tags: '[]',
       importance: 0,
       createdAt: '',
       updatedAt: '',
@@ -206,8 +202,6 @@ export class VectorIndex {
       id: memory.id,
       vector,
       title: memory.title,
-      category: memory.category,
-      tags: JSON.stringify(memory.tags),
       importance: memory.importance,
       createdAt: memory.createdAt,
       updatedAt: memory.updatedAt,

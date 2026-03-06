@@ -13,8 +13,6 @@ function candidate(id: string, title: string, content: string): RetrievalCandida
       id,
       createdAt: now,
       updatedAt: now,
-      tags: [],
-      category: 'general',
       importance: 3,
       title,
       content,
