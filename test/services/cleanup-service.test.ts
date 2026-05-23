@@ -24,10 +24,12 @@ function randomVec(dim = VECTOR_DIM): number[] {
   return vec.map(v => v / norm);
 }
 
-function makeMemory(overrides: Partial<Memory> & {
-  entryType?: MemoryEntryType;
-  ttl?: TTLLevel;
-} = {}): Memory {
+function makeMemory(
+  overrides: Partial<Memory> & {
+    entryType?: MemoryEntryType;
+    ttl?: TTLLevel;
+  } = {}
+): Memory {
   return {
     id: overrides.id ?? 'test-id-' + Math.random().toString(36).slice(2),
     createdAt: overrides.createdAt ?? new Date().toISOString(),
@@ -306,9 +308,13 @@ describe('CleanupService', () => {
       const past = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString();
 
       // Create memories with different states
-      await storage.write(makeMemory({ id: 'moment-1', ttl: 'session', expiresAt: future }));
-      await storage.write(makeMemory({ id: 'moment-2', ttl: 'session', expiresAt: past }));
-      await storage.write(makeMemory({ id: 'moment-3', ttl: 'session' })); // no expiry
+      await storage.write(
+        makeMemory({ id: 'moment-1', title: 'Moment one', ttl: 'session', expiresAt: future })
+      );
+      await storage.write(
+        makeMemory({ id: 'moment-2', title: 'Moment two', ttl: 'session', expiresAt: past })
+      );
+      await storage.write(makeMemory({ id: 'moment-3', title: 'Moment three', ttl: 'session' })); // no expiry
 
       const stats = await cleanupService.getCleanupStats('moment', now);
 

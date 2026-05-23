@@ -1,29 +1,36 @@
-# Shared Daemon Architecture (Draft)
+# Explicit Daemon Architecture
 
 ## Goal
 
-Allow multiple CLI sessions to start MemHub safely while sharing one database instance and one embedding/vector model instance.
+Keep one long-running MemHub backend per storage path while making MCP processes thin clients.
+
+## Commands
+
+- `memhub daemon` / `memhub daemon start`: start the daemon in the background.
+- `memhub daemon run`: run the daemon in the foreground.
+- `memhub daemon status`: show PID, endpoint, lock path, and endpoint file.
+- `memhub daemon stop`: stop the daemon.
+- `memhub daemon restart`: restart the daemon in the background.
+- `memhub daemon logs`: print the daemon log directory and recent log files.
 
 ## Process Model
 
-1. Every CLI session still starts its own MCP stdio process.
-2. Exactly one process becomes `daemon` for a storage path.
-3. Other processes become `client` and proxy `memory_load` / `memory_update` requests to the daemon.
+1. `memhub daemon run` owns `MemoryService`, Markdown storage, WAL, LanceDB, and local models.
+2. Background start spawns `memhub daemon run` as a detached process.
+3. MCP stdio processes use `DaemonClientBackend`; they never become the daemon.
+4. If MCP cannot find a daemon, it starts one automatically unless `MEMHUB_DAEMON_AUTO_START=false`.
 
-## Election Model
+## Single-Instance Lock
 
-1. Use `{storagePath}/.memhub-daemon.lock` as atomic election lock.
-2. First process creating lock with `flag=wx` becomes daemon.
-3. If lock exists, check lock PID liveness:
+1. The daemon uses `{storagePath}/.internal/daemon.lock` as an atomic single-instance lock.
+2. A running daemon publishes `{storagePath}/.internal/daemon.json` with its localhost TCP endpoint.
+3. Stale lock and endpoint files are removed when their PID is no longer alive.
 
-- alive -> stay client
-- dead -> recover stale lock and retry election
-
-4. Daemon publishes endpoint metadata in `{storagePath}/.memhub-daemon.json`.
+This lock protects daemon startup only. It is not an MCP process election mechanism.
 
 ## IPC Protocol
 
-Transport: localhost TCP (JSON lines)
+Transport: localhost TCP with JSON lines.
 
 Request:
 
@@ -40,31 +47,8 @@ Response:
 
 Compatibility guard:
 
-- `protocolVersion` in endpoint file must match client expectation.
-
-## Failover
-
-When client request fails:
-
-1. Client clears cached endpoint.
-2. Client attempts election.
-3. Winner becomes new daemon and serves request locally.
-4. Losers wait for endpoint publication and reconnect.
-
-## Interfaces
-
-- `MemoryBackend`
-  - `initialize()`
-  - `memoryLoad(input)`
-  - `memoryUpdate(input)`
-  - `close()`
-
-- `SharedMemoryBackend`
-  - Implements role election + daemon server + client proxy
-  - Uses existing `MemoryService` as daemon local execution engine
+- `protocolVersion` in the endpoint file must match the client expectation.
 
 ## Integration
 
-`createMcpServer()` now depends on `MemoryBackend` abstraction and uses `SharedMemoryBackend` by default.
-
-This keeps MCP tool behavior unchanged while moving heavy resources to one shared daemon process per storage path.
+`createMcpServer()` depends on the `MemoryBackend` interface and uses `DaemonClientBackend` by default. `DaemonClientBackend` discovers the endpoint, optionally starts the daemon, and forwards `memory_load` / `memory_update` requests over IPC.

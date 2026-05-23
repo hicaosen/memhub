@@ -57,6 +57,21 @@ npx -y memhub@latest init -a claude-code --force
 
 ## How It Works
 
+### Daemon
+
+MemHub runs storage, local models, and retrieval in a single daemon process. MCP server processes connect to that daemon as thin clients.
+
+```bash
+npx -y memhub@latest daemon          # Start in background
+npx -y memhub@latest daemon run      # Run in foreground
+npx -y memhub@latest daemon status   # Show PID and endpoint
+npx -y memhub@latest daemon stop     # Stop daemon
+npx -y memhub@latest daemon restart  # Restart daemon
+npx -y memhub@latest daemon logs     # Show log directory
+```
+
+The MCP server auto-starts the daemon by default. Set `MEMHUB_DAEMON_AUTO_START=false` to require manual daemon management.
+
 ### Memory Tools
 
 MemHub provides two MCP tools for your AI agent:
@@ -129,13 +144,14 @@ Since memories are plain text files, you can:
 
 ## Environment Variables
 
-| Variable                | Default                   | Description                                   |
-| ----------------------- | ------------------------- | --------------------------------------------- |
-| `MEMHUB_STORAGE_PATH`   | `~/.memhub`               | Memory storage directory                      |
-| `MEMHUB_LOG_LEVEL`      | `info`                    | Log level: `debug`, `info`, `warn`, `error`   |
-| `MEMHUB_VECTOR_SEARCH`  | `true`                    | Enable vector retrieval (`false` to disable)  |
-| `MEMHUB_RERANKER_MODE`  | `auto`                    | Reranker mode: `auto`, `model`, `lightweight` |
-| `MEMHUB_RERANKER_MODEL` | `BAAI/bge-reranker-v2-m3` | Override reranker model id                    |
+| Variable                   | Default                   | Description                                   |
+| -------------------------- | ------------------------- | --------------------------------------------- |
+| `MEMHUB_STORAGE_PATH`      | `~/.memhub`               | Memory storage directory                      |
+| `MEMHUB_LOG_LEVEL`         | `info`                    | Log level: `debug`, `info`, `warn`, `error`   |
+| `MEMHUB_VECTOR_SEARCH`     | `true`                    | Enable vector retrieval (`false` to disable)  |
+| `MEMHUB_DAEMON_AUTO_START` | `true`                    | Auto-start daemon from MCP server             |
+| `MEMHUB_RERANKER_MODE`     | `auto`                    | Reranker mode: `auto`, `model`, `lightweight` |
+| `MEMHUB_RERANKER_MODEL`    | `BAAI/bge-reranker-v2-m3` | Override reranker model id                    |
 
 ---
 

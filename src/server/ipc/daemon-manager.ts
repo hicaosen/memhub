@@ -55,7 +55,7 @@ interface LockPayload {
 }
 
 /**
- * Daemon manager - handles daemon election and lifecycle
+ * Daemon manager - handles daemon single-instance lock and endpoint lifecycle
  */
 export class DaemonManager {
   private readonly lockPath: string;
@@ -84,9 +84,9 @@ export class DaemonManager {
   }
 
   /**
-   * Tries to become the daemon process
+   * Tries to acquire the daemon single-instance lock.
    */
-  async tryBecomeDaemon(): Promise<{ becameDaemon: boolean; endpoint?: DaemonEndpoint }> {
+  async tryAcquireDaemonLock(): Promise<{ acquired: boolean; endpoint?: DaemonEndpoint }> {
     const lockPayload: LockPayload = {
       pid: process.pid,
       createdAt: new Date().toISOString(),
@@ -97,7 +97,7 @@ export class DaemonManager {
         encoding: 'utf8',
         flag: 'wx',
       });
-      await this.logger.info('lock.acquire', 'Acquired daemon election lock', {
+      await this.logger.info('lock.acquire', 'Acquired daemon lock', {
         meta: { lockPath: this.lockPath },
       });
     } catch (error) {
@@ -110,7 +110,7 @@ export class DaemonManager {
       if (!alreadyExists) throw error;
 
       const staleRecovered = await this.tryRecoverStaleLock();
-      if (!staleRecovered) return { becameDaemon: false };
+      if (!staleRecovered) return { acquired: false };
 
       try {
         await fs.writeFile(this.lockPath, JSON.stringify(lockPayload), {
@@ -127,16 +127,16 @@ export class DaemonManager {
         if (stillExists) {
           await this.logger.info(
             'lock.race_lost',
-            'Lost daemon lock race after stale lock recovery, continuing as client'
+            'Lost daemon lock race after stale lock recovery'
           );
-          return { becameDaemon: false };
+          return { acquired: false };
         }
         throw retryError;
       }
     }
 
     // Note: The caller is responsible for starting the server and writing the endpoint
-    return { becameDaemon: true };
+    return { acquired: true };
   }
 
   /**
@@ -200,7 +200,7 @@ export class DaemonManager {
           await safeUnlink(this.endpointPath);
           await this.logger.warn(
             'daemon.dead',
-            'Discovered dead daemon endpoint, triggering election'
+            'Discovered dead daemon endpoint, cleaning up daemon files'
           );
           break;
         }

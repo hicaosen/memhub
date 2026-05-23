@@ -5,13 +5,19 @@
  * - With args: run CLI commands
  */
 
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import * as p from '@clack/prompts';
 import { AGENTS, type AgentType } from './types.js';
 import { initAgent, selectAgentInteractive } from './init.js';
-import { createMcpServer } from '../server/mcp-server.js';
+import { createMcpServer, resolveStoragePath } from '../server/mcp-server.js';
+import {
+  DaemonAlreadyRunningError,
+  DaemonController,
+  DaemonNotRunningError,
+  getDaemonLogDir,
+} from '../server/daemon.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { installStdioLifecycleGuard } from '../server/stdio-lifecycle.js';
 import {
@@ -23,6 +29,7 @@ import {
   isModelDownloaded,
   type DownloadProgress,
 } from '../services/model-manager/index.js';
+import type { RerankerMode } from '../services/retrieval/reranker.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -63,6 +70,13 @@ MemHub CLI v${VERSION} - Git-friendly memory for AI agents
 
 Usage:
   memhub                       Start MCP server (default)
+  memhub daemon                Start daemon in background
+  memhub daemon start          Start daemon in background
+  memhub daemon run            Run daemon in foreground
+  memhub daemon status         Show daemon status
+  memhub daemon stop           Stop daemon
+  memhub daemon restart        Restart daemon in background
+  memhub daemon logs           Show daemon log directory
   memhub install [options]     Download models and configure agent
   memhub --help                Show this help message
   memhub --version             Show version
@@ -78,6 +92,8 @@ ${AGENTS.map(a => `  ${a.id.padEnd(15)} ${a.name}`).join('\n')}
 
 Examples:
   memhub                               # Start MCP server
+  memhub daemon                        # Start background daemon
+  memhub daemon run                    # Run foreground daemon
   memhub install                       # Download models + interactive selection
   memhub install --local               # Download models + project config
   memhub install --agent cursor        # Download models + configure for Cursor
@@ -100,6 +116,117 @@ function parseAgent(value: string): AgentType | null {
   return null;
 }
 
+function resolveRerankerMode(raw?: string): RerankerMode {
+  if (raw === 'model' || raw === 'lightweight' || raw === 'auto') {
+    return raw;
+  }
+  return 'auto';
+}
+
+function createDaemonController(): DaemonController {
+  return new DaemonController({
+    storagePath: resolveStoragePath(),
+    vectorSearch: process.env.MEMHUB_VECTOR_SEARCH !== 'false',
+    rerankerMode: resolveRerankerMode(process.env.MEMHUB_RERANKER_MODE),
+    rerankerModelName: process.env.MEMHUB_RERANKER_MODEL,
+  });
+}
+
+function printDaemonStatus(status: Awaited<ReturnType<DaemonController['status']>>): void {
+  if (status.endpoint) {
+    // eslint-disable-next-line no-console
+    console.log(`MemHub daemon is running`);
+    // eslint-disable-next-line no-console
+    console.log(`  pid: ${status.endpoint.pid}`);
+    // eslint-disable-next-line no-console
+    console.log(`  endpoint: ${status.endpoint.host}:${status.endpoint.port}`);
+    // eslint-disable-next-line no-console
+    console.log(`  protocol: ${status.endpoint.protocolVersion}`);
+  } else {
+    // eslint-disable-next-line no-console
+    console.log('MemHub daemon is not running');
+  }
+  // eslint-disable-next-line no-console
+  console.log(`  lock: ${status.lockPath}`);
+  // eslint-disable-next-line no-console
+  console.log(`  endpoint file: ${status.endpointPath}`);
+}
+
+function printDaemonLogs(): void {
+  const logDir = getDaemonLogDir();
+  // eslint-disable-next-line no-console
+  console.log(`MemHub daemon logs: ${logDir}`);
+  if (!existsSync(logDir)) return;
+
+  const names = readdirSync(logDir)
+    .filter(name => name.startsWith('daemon-') || name.startsWith('error-'))
+    .sort()
+    .slice(-5);
+
+  for (const name of names) {
+    // eslint-disable-next-line no-console
+    console.log(`  ${name}`);
+  }
+}
+
+async function runDaemonCommand(args: string[]): Promise<void> {
+  const subcommand = args[1] ?? 'start';
+  const controller = createDaemonController();
+  const cliEntryPath = process.argv[1] ?? __filename;
+
+  try {
+    switch (subcommand) {
+      case 'start': {
+        const result = await controller.startBackground(cliEntryPath);
+        const action = result.started ? 'started' : 'already running';
+        // eslint-disable-next-line no-console
+        console.log(`MemHub daemon ${action} (pid=${result.endpoint.pid})`);
+        break;
+      }
+      case 'run': {
+        const endpoint = await controller.startForeground();
+        // eslint-disable-next-line no-console
+        console.log(`MemHub daemon running in foreground (pid=${endpoint.pid})`);
+        break;
+      }
+      case 'status': {
+        printDaemonStatus(await controller.status());
+        break;
+      }
+      case 'stop': {
+        await controller.stop();
+        // eslint-disable-next-line no-console
+        console.log('MemHub daemon stopped');
+        break;
+      }
+      case 'restart': {
+        const result = await controller.restart(cliEntryPath);
+        // eslint-disable-next-line no-console
+        console.log(`MemHub daemon restarted (pid=${result.endpoint.pid})`);
+        break;
+      }
+      case 'logs': {
+        printDaemonLogs();
+        break;
+      }
+      default:
+        p.log.error(`Unknown daemon command: ${subcommand}`);
+        p.log.info('Run "memhub --help" for usage information.');
+        process.exit(1);
+    }
+  } catch (error) {
+    if (error instanceof DaemonAlreadyRunningError) {
+      p.log.error(error.message);
+      process.exit(1);
+    }
+    if (error instanceof DaemonNotRunningError) {
+      p.log.error(error.message);
+      process.exit(1);
+    }
+    throw error;
+  }
+}
+
 async function runCli(args: string[]): Promise<void> {
   // Parse command
   const command = args[0];
@@ -112,6 +239,11 @@ async function runCli(args: string[]): Promise<void> {
   if (command === '--version' || command === '-v') {
     printVersion();
     process.exit(0);
+  }
+
+  if (command === 'daemon') {
+    await runDaemonCommand(args);
+    return;
   }
 
   if (command !== 'install') {

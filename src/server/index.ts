@@ -3,4 +3,6 @@
  */
 
 export * from './mcp-server.js';
-export * from './shared-memory-backend.js';
+export * from './memory-backend.js';
+export * from './daemon.js';
+export * from './daemon-client-backend.js';

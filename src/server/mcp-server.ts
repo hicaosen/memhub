@@ -15,7 +15,8 @@ import { ServiceError } from '../services/memory-service.js';
 import { MemoryLoadInputSchema, MemoryUpdateInputV2Schema } from '../contracts/schemas.js';
 import { MCP_PROTOCOL_VERSION, TOOL_DEFINITIONS, SERVER_INFO } from '../contracts/mcp.js';
 import { ErrorCode } from '../contracts/types.js';
-import { SharedMemoryBackend, type MemoryBackend } from './shared-memory-backend.js';
+import { DaemonClientBackend } from './daemon-client-backend.js';
+import type { MemoryBackend } from './memory-backend.js';
 import type { RerankerMode } from '../services/retrieval/reranker.js';
 import { installStdioLifecycleGuard } from './stdio-lifecycle.js';
 
@@ -61,6 +62,14 @@ function resolveRerankerMode(raw?: string): EffectiveRerankerMode {
   return 'auto';
 }
 
+function resolveCliEntryPath(): string {
+  const currentArg = process.argv[1];
+  if (currentArg && !currentArg.endsWith('mcp-server.js')) {
+    return currentArg;
+  }
+  return join(__dirname, '../cli/index.js');
+}
+
 /**
  * Resolve storage path with the following priority:
  * 1. MEMHUB_STORAGE_PATH env var (if set):
@@ -92,11 +101,13 @@ export function createMcpServer(): Server {
   const vectorSearch = process.env.MEMHUB_VECTOR_SEARCH !== 'false';
   const rerankerMode = resolveRerankerMode(process.env.MEMHUB_RERANKER_MODE) as RerankerMode;
   const rerankerModelName = process.env.MEMHUB_RERANKER_MODEL;
-  const memoryBackend: MemoryBackend = new SharedMemoryBackend({
+  const memoryBackend: MemoryBackend = new DaemonClientBackend({
     storagePath,
     vectorSearch,
     rerankerMode,
     rerankerModelName,
+    autoStart: process.env.MEMHUB_DAEMON_AUTO_START !== 'false',
+    cliEntryPath: resolveCliEntryPath(),
   });
 
   // Create server using SDK

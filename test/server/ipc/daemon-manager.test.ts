@@ -89,15 +89,15 @@ describe('DaemonManager', () => {
     });
   });
 
-  describe('tryBecomeDaemon', () => {
+  describe('tryAcquireDaemonLock', () => {
     it('acquires lock when no existing lock', async () => {
       tempDir = mkdtempSync(join(tmpdir(), 'memhub-daemon-manager-test-'));
       mkdirSync(getInternalPath(tempDir), { recursive: true });
       const manager = new DaemonManager(tempDir, createLoggerStub());
 
-      const result = await manager.tryBecomeDaemon();
+      const result = await manager.tryAcquireDaemonLock();
 
-      expect(result.becameDaemon).toBe(true);
+      expect(result.acquired).toBe(true);
       expect(existsSync(manager.getLockPath())).toBe(true);
     });
 
@@ -112,9 +112,9 @@ describe('DaemonManager', () => {
         JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() })
       );
 
-      const result = await manager.tryBecomeDaemon();
+      const result = await manager.tryAcquireDaemonLock();
 
-      expect(result.becameDaemon).toBe(false);
+      expect(result.acquired).toBe(false);
     });
 
     it('recovers stale lock when process is dead', async () => {
@@ -128,9 +128,9 @@ describe('DaemonManager', () => {
         JSON.stringify({ pid: 9999999, createdAt: new Date().toISOString() })
       );
 
-      const result = await manager.tryBecomeDaemon();
+      const result = await manager.tryAcquireDaemonLock();
 
-      expect(result.becameDaemon).toBe(true);
+      expect(result.acquired).toBe(true);
     });
 
     it('recovers malformed lock file', async () => {
@@ -141,9 +141,9 @@ describe('DaemonManager', () => {
       // Write an invalid JSON lock file
       writeFileSync(manager.getLockPath(), 'not valid json');
 
-      const result = await manager.tryBecomeDaemon();
+      const result = await manager.tryAcquireDaemonLock();
 
-      expect(result.becameDaemon).toBe(true);
+      expect(result.acquired).toBe(true);
     });
   });
 

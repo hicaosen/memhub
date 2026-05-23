@@ -15,20 +15,21 @@ npx -y memhub@latest init
 ```
 
 This launches an interactive prompt to select your agent. MemHub will:
+
 1. Add MCP server config to your agent's configuration file
 2. Add MemHub usage instructions to your agent's rules file
 
 **Supported Agents:**
 
-| Agent | Config File | Instructions File |
-|-------|-------------|-------------------|
-| Claude Code | `~/.claude.json` | `~/.claude/CLAUDE.md` |
-| Cursor | `~/.cursor/mcp.json` | `~/.cursorrules` |
-| Cline | `~/.cline/mcp.json` | `~/.clinerules` |
-| Windsurf | `~/.codeium/windsurf/mcp_config.json` | `~/.windsurfrules` |
-| Factory Droid | `~/.factory/mcp.json` | `~/.factory/AGENTS.md` |
-| Gemini CLI | `~/.gemini/settings.json` | `~/.gemini/GEMINI.md` |
-| Codex | `~/.codex/config.toml` | `~/.codex/AGENTS.md` |
+| Agent         | Config File                           | Instructions File      |
+| ------------- | ------------------------------------- | ---------------------- |
+| Claude Code   | `~/.claude.json`                      | `~/.claude/CLAUDE.md`  |
+| Cursor        | `~/.cursor/mcp.json`                  | `~/.cursorrules`       |
+| Cline         | `~/.cline/mcp.json`                   | `~/.clinerules`        |
+| Windsurf      | `~/.codeium/windsurf/mcp_config.json` | `~/.windsurfrules`     |
+| Factory Droid | `~/.factory/mcp.json`                 | `~/.factory/AGENTS.md` |
+| Gemini CLI    | `~/.gemini/settings.json`             | `~/.gemini/GEMINI.md`  |
+| Codex         | `~/.codex/config.toml`                | `~/.codex/AGENTS.md`   |
 
 ### CLI Options
 
@@ -46,11 +47,11 @@ npx -y memhub@latest init -a cursor -l
 npx -y memhub@latest init -a claude-code --force
 ```
 
-| Option | Description |
-|--------|-------------|
-| `-a, --agent <name>` | Agent type (skip interactive) |
-| `-l, --local` | Configure for current project (default: global) |
-| `-f, --force` | Update existing configuration |
+| Option               | Description                                     |
+| -------------------- | ----------------------------------------------- |
+| `-a, --agent <name>` | Agent type (skip interactive)                   |
+| `-l, --local`        | Configure for current project (default: global) |
+| `-f, --force`        | Update existing configuration                   |
 
 ### Run as MCP Server
 
@@ -59,6 +60,21 @@ npx -y memhub@latest
 ```
 
 > On Windows, do **not** append `memhub` after the package name.
+
+### Run the Daemon
+
+MemHub uses one daemon process for storage, local models, and retrieval. MCP server processes connect to it as clients.
+
+```bash
+npx -y memhub@latest daemon          # Start daemon in the background
+npx -y memhub@latest daemon run      # Run daemon in the foreground
+npx -y memhub@latest daemon status   # Show daemon status
+npx -y memhub@latest daemon stop     # Stop daemon
+npx -y memhub@latest daemon restart  # Restart daemon
+npx -y memhub@latest daemon logs     # Show log directory
+```
+
+The MCP server auto-starts the daemon by default when no daemon is running.
 
 ### Manual Configuration
 
@@ -107,6 +123,7 @@ You have access to persistent memory across conversations. Use it wisely:
 #### `memory_load`
 
 Call when you need context from past conversations:
+
 - User references something from before
 - You're unsure about user preferences
 - A decision needs historical context
@@ -116,6 +133,7 @@ Don't call for simple, self-contained tasks.
 #### `memory_update`
 
 Call when you discover something worth remembering:
+
 - User expresses a preference
 - You made a significant decision with reasoning
 - Project context changed
@@ -168,6 +186,7 @@ User Query → Local Embedding Model → Vector Search → Ranked Results
 ```
 
 When you call `memory_load`, MemHub:
+
 1. Converts your query to a vector using a local quantized model
 2. Searches the LanceDB index for semantically similar memories
 3. Returns ranked results with relevance scores
@@ -192,6 +211,7 @@ This means "testing framework preference" finds memories about "Vitest vs Jest d
 - `MEMHUB_STORAGE_PATH` (default: `~/.memhub`)
 - `MEMHUB_LOG_LEVEL` (default: `info`, options: `debug|info|warn|error`)
 - `MEMHUB_VECTOR_SEARCH` (default: `true`, set `false` to disable vector retrieval)
+- `MEMHUB_DAEMON_AUTO_START` (default: `true`, set `false` to require manual `memhub daemon`)
 - `MEMHUB_RERANKER_MODE` (default: `auto`, options: `auto|model|lightweight`)
 - `MEMHUB_RERANKER_MODEL` (default: `BAAI/bge-reranker-v2-m3`)
 
@@ -201,13 +221,13 @@ This means "testing framework preference" finds memories about "Vitest vs Jest d
 
 ```markdown
 ---
-id: "550e8400-e29b-41d4-a716-446655440000"
-created_at: "2026-03-03T08:00:00.000Z"
-updated_at: "2026-03-03T08:00:00.000Z"
+id: '550e8400-e29b-41d4-a716-446655440000'
+created_at: '2026-03-03T08:00:00.000Z'
+updated_at: '2026-03-03T08:00:00.000Z'
 tags:
   - architecture
   - tdd
-category: "engineering"
+category: 'engineering'
 importance: 4
 ---
 
