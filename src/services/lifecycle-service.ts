@@ -16,7 +16,12 @@ import { determineLayer } from './retrieval/layer-types.js';
 /**
  * Lifecycle action types
  */
-export type LifecycleAction = 'upgrade_to_core' | 'upgrade_to_journey' | 'downgrade_to_moment' | 'archive' | 'keep';
+export type LifecycleAction =
+  | 'upgrade_to_core'
+  | 'upgrade_to_journey'
+  | 'downgrade_to_moment'
+  | 'archive'
+  | 'keep';
 
 /**
  * Reason for lifecycle recommendation
@@ -149,9 +154,7 @@ export class LifecycleService {
     let daysUntilExpiry: number | null = null;
     if (memory.expiresAt) {
       const expiryDate = new Date(memory.expiresAt);
-      daysUntilExpiry = Math.floor(
-        (expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-      );
+      daysUntilExpiry = Math.floor((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     }
 
     // Determine recommended action
@@ -196,7 +199,12 @@ export class LifecycleService {
       if (memory.entryType === 'preference' || memory.entryType === 'decision') {
         if (accessCount >= this.config.upgradeAccessThreshold) {
           // Confidence: starts at 0.6 when threshold is met, grows to 1.0 at 2x threshold
-          const confidence = Math.min(1, 0.6 + (accessCount - this.config.upgradeAccessThreshold) / (this.config.upgradeAccessThreshold * 2.5));
+          const confidence = Math.min(
+            1,
+            0.6 +
+              (accessCount - this.config.upgradeAccessThreshold) /
+                (this.config.upgradeAccessThreshold * 2.5)
+          );
           return {
             action: 'upgrade_to_core',
             reason: 'frequent_access',
@@ -231,7 +239,12 @@ export class LifecycleService {
       // Check for upgrade potential
       if (accessCount >= this.config.upgradeAccessThreshold) {
         // Confidence: starts at 0.6 when threshold is met, grows to 1.0 at 2x threshold
-        const confidence = Math.min(1, 0.6 + (accessCount - this.config.upgradeAccessThreshold) / (this.config.upgradeAccessThreshold * 2.5));
+        const confidence = Math.min(
+          1,
+          0.6 +
+            (accessCount - this.config.upgradeAccessThreshold) /
+              (this.config.upgradeAccessThreshold * 2.5)
+        );
         return {
           action: 'upgrade_to_journey',
           reason: 'frequent_access',
@@ -272,10 +285,7 @@ export class LifecycleService {
    * @param now - Current timestamp
    * @returns Memories recommended for upgrade
    */
-  getUpgradeCandidates(
-    memories: readonly Memory[],
-    now: Date = new Date()
-  ): LifecycleEvaluation[] {
+  getUpgradeCandidates(memories: readonly Memory[], now: Date = new Date()): LifecycleEvaluation[] {
     return this.batchEvaluate(memories, now).filter(
       e =>
         (e.action === 'upgrade_to_core' || e.action === 'upgrade_to_journey') &&
@@ -306,10 +316,7 @@ export class LifecycleService {
    * @param now - Current timestamp
    * @returns Memories recommended for archival
    */
-  getArchiveCandidates(
-    memories: readonly Memory[],
-    now: Date = new Date()
-  ): LifecycleEvaluation[] {
+  getArchiveCandidates(memories: readonly Memory[], now: Date = new Date()): LifecycleEvaluation[] {
     return this.batchEvaluate(memories, now).filter(
       e => e.action === 'archive' && e.confidence >= this.config.minConfidence
     );

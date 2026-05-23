@@ -8,7 +8,10 @@ import {
   TYPE_WEIGHTS,
   type MemoryLayer,
 } from '../../../src/services/retrieval/layer-types.js';
-import { scoreCandidate, type ScoreCandidateInput } from '../../../src/services/retrieval/hybrid-scorer.js';
+import {
+  scoreCandidate,
+  type ScoreCandidateInput,
+} from '../../../src/services/retrieval/hybrid-scorer.js';
 import type { MemoryEntryType, TTLLevel } from '../../../src/contracts/types.js';
 
 describe('layer-types', () => {

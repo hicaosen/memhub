@@ -138,22 +138,22 @@ describe('VectorIndex Layer Support - Phase 2', () => {
 
   describe('Type Weights', () => {
     it('decision has highest type weight (1.1)', () => {
-        expect(TYPE_WEIGHTS.decision).toBe(1.1);
-      });
+      expect(TYPE_WEIGHTS.decision).toBe(1.1);
+    });
 
     it('preference and constraint have neutral type weight (1.0)', () => {
-        expect(TYPE_WEIGHTS.preference).toBe(1.0);
-        expect(TYPE_WEIGHTS.constraint).toBe(1.0);
-      });
+      expect(TYPE_WEIGHTS.preference).toBe(1.0);
+      expect(TYPE_WEIGHTS.constraint).toBe(1.0);
+    });
 
     it('procedure has lower type weight (0.9)', () => {
-        expect(TYPE_WEIGHTS.procedure).toBe(0.9);
-      });
+      expect(TYPE_WEIGHTS.procedure).toBe(0.9);
+    });
 
     it('session has lowest type weight (0.7)', () => {
-        expect(TYPE_WEIGHTS.session).toBe(0.7);
-      });
+      expect(TYPE_WEIGHTS.session).toBe(0.7);
     });
+  });
 
   describe('determineLayer Function', () => {
     it('returns core for permanent preference', () => {
@@ -173,191 +173,191 @@ describe('VectorIndex Layer Support - Phase 2', () => {
     });
 
     it('returns journey for long ttl regardless of type', () => {
-        expect(determineLayer('preference', 'long')).toBe('journey');
-        expect(determineLayer('decision', 'long')).toBe('journey');
-        expect(determineLayer('procedure', 'long')).toBe('journey');
-      });
+      expect(determineLayer('preference', 'long')).toBe('journey');
+      expect(determineLayer('decision', 'long')).toBe('journey');
+      expect(determineLayer('procedure', 'long')).toBe('journey');
+    });
 
     it('returns journey for medium ttl', () => {
-        expect(determineLayer('preference', 'medium')).toBe('journey');
-        expect(determineLayer('session', 'medium')).toBe('journey');
-      });
+      expect(determineLayer('preference', 'medium')).toBe('journey');
+      expect(determineLayer('session', 'medium')).toBe('journey');
+    });
 
     it('returns moment for short ttl', () => {
-        expect(determineLayer('preference', 'short')).toBe('moment');
-        expect(determineLayer('session', 'short')).toBe('moment');
-      });
+      expect(determineLayer('preference', 'short')).toBe('moment');
+      expect(determineLayer('session', 'short')).toBe('moment');
+    });
 
     it('returns moment for session ttl', () => {
-        expect(determineLayer('session', 'session')).toBe('moment');
-        expect(determineLayer('preference', 'session')).toBe('moment');
-      });
+      expect(determineLayer('session', 'session')).toBe('moment');
+      expect(determineLayer('preference', 'session')).toBe('moment');
+    });
 
     it('returns journey for undefined entryType and ttl', () => {
-        expect(determineLayer(undefined, undefined)).toBe('journey');
-      });
+      expect(determineLayer(undefined, undefined)).toBe('journey');
+    });
 
     it('returns journey for undefined entryType with long/medium ttl', () => {
-        expect(determineLayer(undefined, 'long')).toBe('journey');
-        expect(determineLayer(undefined, 'medium')).toBe('journey');
-      });
+      expect(determineLayer(undefined, 'long')).toBe('journey');
+      expect(determineLayer(undefined, 'medium')).toBe('journey');
+    });
 
     it('returns moment for undefined entryType with short/session ttl', () => {
-        expect(determineLayer(undefined, 'short')).toBe('moment');
-        expect(determineLayer(undefined, 'session')).toBe('moment');
-      });
+      expect(determineLayer(undefined, 'short')).toBe('moment');
+      expect(determineLayer(undefined, 'session')).toBe('moment');
     });
+  });
 
   describe('calculateFreshnessFactor Function', () => {
     const now = new Date('2024-06-15T12:00:00Z');
 
     it('returns 1.0 for permanent memories (no expiry)', () => {
-        const createdAt = '2024-01-01T00:00:00Z';
-        expect(calculateFreshnessFactor(undefined, createdAt, now)).toBe(1.0);
-      });
+      const createdAt = '2024-01-01T00:00:00Z';
+      expect(calculateFreshnessFactor(undefined, createdAt, now)).toBe(1.0);
+    });
 
     it('returns 1.0 for newly created memories', () => {
-        const createdAt = '2024-06-15T12:00:00Z';
-        const expiresAt = '2024-07-15T12:00:00Z';
-        expect(calculateFreshnessFactor(expiresAt, createdAt, now)).toBe(1.0);
-      });
+      const createdAt = '2024-06-15T12:00:00Z';
+      const expiresAt = '2024-07-15T12:00:00Z';
+      expect(calculateFreshnessFactor(expiresAt, createdAt, now)).toBe(1.0);
+    });
 
     it('decreases as memory approaches expiry', () => {
-        const createdAt = '2024-06-01T00:00:00Z';
-        const expiresAt = '2024-06-30T00:00:00Z'; // 30 days TTL
-        // At now=2024-06-15, we're halfway through the TTL
-        // Expected: 1.0 - 0.5 * 0.2 = 0.9
-        const factor = calculateFreshnessFactor(expiresAt, createdAt, now);
-        expect(factor).toBeCloseTo(0.9, 0.01);
-      });
+      const createdAt = '2024-06-01T00:00:00Z';
+      const expiresAt = '2024-06-30T00:00:00Z'; // 30 days TTL
+      // At now=2024-06-15, we're halfway through the TTL
+      // Expected: 1.0 - 0.5 * 0.2 = 0.9
+      const factor = calculateFreshnessFactor(expiresAt, createdAt, now);
+      expect(factor).toBeCloseTo(0.9, 0.01);
+    });
 
     it('returns 0.8 for expired memories', () => {
-        const createdAt = '2024-05-01T00:00:00Z';
-        const expiresAt = '2024-06-01T00:00:00Z';
-        expect(calculateFreshnessFactor(expiresAt, createdAt, now)).toBe(0.8);
-      });
+      const createdAt = '2024-05-01T00:00:00Z';
+      const expiresAt = '2024-06-01T00:00:00Z';
+      expect(calculateFreshnessFactor(expiresAt, createdAt, now)).toBe(0.8);
+    });
 
     it('never drops below 0.8', () => {
-        const createdAt = '2024-01-01T00:00:00Z';
-        const expiresAt = '2024-06-14T00:00:00Z'; // Expired yesterday
-        expect(calculateFreshnessFactor(expiresAt, createdAt, now)).toBe(0.8);
-      });
+      const createdAt = '2024-01-01T00:00:00Z';
+      const expiresAt = '2024-06-14T00:00:00Z'; // Expired yesterday
+      expect(calculateFreshnessFactor(expiresAt, createdAt, now)).toBe(0.8);
     });
+  });
 
   describe('getLayerWeight Function', () => {
     it('returns correct weight for core layer', () => {
-        expect(getLayerWeight('core')).toBe(1.2);
-      });
+      expect(getLayerWeight('core')).toBe(1.2);
+    });
 
     it('returns correct weight for journey layer', () => {
-        expect(getLayerWeight('journey')).toBe(1.0);
-      });
+      expect(getLayerWeight('journey')).toBe(1.0);
+    });
 
     it('returns correct weight for moment layer', () => {
-        expect(getLayerWeight('moment')).toBe(0.8);
-      });
+      expect(getLayerWeight('moment')).toBe(0.8);
     });
+  });
 
   describe('getTypeWeight Function', () => {
     it('returns correct weight for decision type', () => {
-        expect(getTypeWeight('decision')).toBe(1.1);
-      });
+      expect(getTypeWeight('decision')).toBe(1.1);
+    });
 
     it('returns correct weight for preference type', () => {
-        expect(getTypeWeight('preference')).toBe(1.0);
-      });
+      expect(getTypeWeight('preference')).toBe(1.0);
+    });
 
     it('returns correct weight for constraint type', () => {
-        expect(getTypeWeight('constraint')).toBe(1.0);
-      });
+      expect(getTypeWeight('constraint')).toBe(1.0);
+    });
 
     it('returns correct weight for procedure type', () => {
-        expect(getTypeWeight('procedure')).toBe(0.9);
-      });
+      expect(getTypeWeight('procedure')).toBe(0.9);
+    });
 
     it('returns correct weight for session type', () => {
-        expect(getTypeWeight('session')).toBe(0.7);
-      });
+      expect(getTypeWeight('session')).toBe(0.7);
+    });
 
     it('returns 1.0 for undefined entryType', () => {
-        expect(getTypeWeight(undefined)).toBe(1.0);
-      });
+      expect(getTypeWeight(undefined)).toBe(1.0);
     });
+  });
 
   describe('Layer Score Calculation', () => {
     const now = new Date('2024-06-15T12:00:00Z');
 
     it('core layer scores higher than moment layer with same vector distance', () => {
-        const coreScore = calculateLayerScore(
-          0.1, // distance (lower = more similar)
-          'core',
-          'preference',
-          '2024-01-01T00:00:00Z',
-          undefined, // permanent
-          now
-        );
+      const coreScore = calculateLayerScore(
+        0.1, // distance (lower = more similar)
+        'core',
+        'preference',
+        '2024-01-01T00:00:00Z',
+        undefined, // permanent
+        now
+      );
 
-        const momentScore = calculateLayerScore(
-          0.1, // same distance
-          'moment',
-          'session',
-          '2024-06-15T00:00:00Z',
-          '2024-06-16T00:00:00Z',
-          now
-        );
+      const momentScore = calculateLayerScore(
+        0.1, // same distance
+        'moment',
+        'session',
+        '2024-06-15T00:00:00Z',
+        '2024-06-16T00:00:00Z',
+        now
+      );
 
-        // Core: (1-0.1) * 1.2 * 1.0 * 1.0 = 1.08
-        // Moment: (1-0.1) * 0.8 * 0.7 * ~1.0 = ~0.504
-        expect(coreScore).toBeGreaterThan(momentScore);
-      });
+      // Core: (1-0.1) * 1.2 * 1.0 * 1.0 = 1.08
+      // Moment: (1-0.1) * 0.8 * 0.7 * ~1.0 = ~0.504
+      expect(coreScore).toBeGreaterThan(momentScore);
+    });
 
     it('decision type gets boost over preference in same layer', () => {
-        const decisionScore = calculateLayerScore(
-          0.1,
-          'core',
-          'decision',
-          '2024-01-01T00:00:00Z',
-          undefined,
-          now
-        );
+      const decisionScore = calculateLayerScore(
+        0.1,
+        'core',
+        'decision',
+        '2024-01-01T00:00:00Z',
+        undefined,
+        now
+      );
 
-        const preferenceScore = calculateLayerScore(
-          0.1,
-          'core',
-          'preference',
-          '2024-01-01T00:00:00Z',
-          undefined,
-          now
-        );
+      const preferenceScore = calculateLayerScore(
+        0.1,
+        'core',
+        'preference',
+        '2024-01-01T00:00:00Z',
+        undefined,
+        now
+      );
 
-        // Decision: 0.9 * 1.2 * 1.1 * 1.0 = 1.188
-        // Preference: 0.9 * 1.2 * 1.0 * 1.0 = 1.08
-        expect(decisionScore).toBeGreaterThan(preferenceScore);
-      });
+      // Decision: 0.9 * 1.2 * 1.1 * 1.0 = 1.188
+      // Preference: 0.9 * 1.2 * 1.0 * 1.0 = 1.08
+      expect(decisionScore).toBeGreaterThan(preferenceScore);
+    });
 
     it('freshness factor affects score for non-permanent memories', () => {
-        const freshScore = calculateLayerScore(
-          0.1,
-          'journey',
-          'procedure',
-          '2024-06-15T00:00:00Z', // Just created
-          '2024-07-15T00:00:00Z', // Expires in 30 days
-          now
-        );
+      const freshScore = calculateLayerScore(
+        0.1,
+        'journey',
+        'procedure',
+        '2024-06-15T00:00:00Z', // Just created
+        '2024-07-15T00:00:00Z', // Expires in 30 days
+        now
+      );
 
-        const staleScore = calculateLayerScore(
-          0.1,
-          'journey',
-          'procedure',
-          '2024-05-15T00:00:00Z', // Created 31 days ago
-          '2024-06-16T00:00:00Z', // Expires tomorrow
-          now
-        );
+      const staleScore = calculateLayerScore(
+        0.1,
+        'journey',
+        'procedure',
+        '2024-05-15T00:00:00Z', // Created 31 days ago
+        '2024-06-16T00:00:00Z', // Expires tomorrow
+        now
+      );
 
-        // Fresh should have higher score due to freshness factor
-        expect(freshScore).toBeGreaterThan(staleScore);
-      });
+      // Fresh should have higher score due to freshness factor
+      expect(freshScore).toBeGreaterThan(staleScore);
     });
+  });
 
   describe('VectorIndex Basic Operations with Layers', () => {
     it('can upsert and retrieve core layer memory', async () => {

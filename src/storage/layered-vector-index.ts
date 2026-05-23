@@ -162,10 +162,7 @@ export class LayeredVectorIndex {
     try {
       const raw = await readFile(this.metadataPath, 'utf-8');
       const parsed = JSON.parse(raw) as Partial<LayeredIndexMetadata>;
-      if (
-        typeof parsed.schemaVersion === 'number' &&
-        typeof parsed.vectorDim === 'number'
-      ) {
+      if (typeof parsed.schemaVersion === 'number' && typeof parsed.vectorDim === 'number') {
         return {
           schemaVersion: parsed.schemaVersion,
           vectorDim: parsed.vectorDim,
@@ -284,7 +281,8 @@ export class LayeredVectorIndex {
     for (const layer of ['core', 'journey', 'moment'] as const) {
       const table = this.tables.get(layer)!;
       try {
-        const results = (await table.vectorSearch(vector)
+        const results = (await table
+          .vectorSearch(vector)
           .limit(limit)
           .toArray()) as VectorSearchResult[];
 
@@ -302,7 +300,8 @@ export class LayeredVectorIndex {
           message.includes('query vector dimension');
         if (!shouldRebuild) throw error;
         await this.rebuildTable(layer);
-        const results = (await table.vectorSearch(vector)
+        const results = (await table
+          .vectorSearch(vector)
           .limit(limit)
           .toArray()) as VectorSearchResult[];
         for (const row of results) {
@@ -339,9 +338,7 @@ export class LayeredVectorIndex {
     const table = this.tables.get(layer)!;
     let results: VectorSearchResult[];
     try {
-      results = (await table.vectorSearch(vector)
-        .limit(limit)
-        .toArray()) as VectorSearchResult[];
+      results = (await table.vectorSearch(vector).limit(limit).toArray()) as VectorSearchResult[];
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
       const shouldRebuild =
@@ -349,9 +346,7 @@ export class LayeredVectorIndex {
         message.includes('query vector dimension');
       if (!shouldRebuild) throw error;
       await this.rebuildTable(layer);
-      results = (await table.vectorSearch(vector)
-        .limit(limit)
-        .toArray()) as VectorSearchResult[];
+      results = (await table.vectorSearch(vector).limit(limit).toArray()) as VectorSearchResult[];
     }
 
     return results.map(row => ({

@@ -13,8 +13,19 @@ import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { VectorIndex } from '../../src/storage/vector-index.js';
-import { type MemoryLayer, determineLayer, LAYER_WEIGHTS, TYPE_WEIGHTS, calculateFreshnessFactor } from '../../src/services/retrieval/layer-types.js';
-import { layeredSearch, searchLayers, distanceToScore, LAYER_ORDER } from '../../src/services/retrieval/layered-search.js';
+import {
+  type MemoryLayer,
+  determineLayer,
+  LAYER_WEIGHTS,
+  TYPE_WEIGHTS,
+  calculateFreshnessFactor,
+} from '../../src/services/retrieval/layer-types.js';
+import {
+  layeredSearch,
+  searchLayers,
+  distanceToScore,
+  LAYER_ORDER,
+} from '../../src/services/retrieval/layered-search.js';
 import type { Memory } from '../../src/contracts/types.js';
 import { VECTOR_DIM } from '../../src/services/embedding-service.js';
 
@@ -348,11 +359,13 @@ describe('Layered Search', () => {
 
     it('should respect limit parameter', async () => {
       for (let i = 0; i < 5; i++) {
-        await addMemory(makeMemory({
-          id: `core-${i}`,
-          entryType: 'preference',
-          ttl: 'permanent',
-        }));
+        await addMemory(
+          makeMemory({
+            id: `core-${i}`,
+            entryType: 'preference',
+            ttl: 'permanent',
+          })
+        );
       }
 
       const results = await searchLayers(index, randomVec(), ['core'], 3);
@@ -382,7 +395,7 @@ describe('Layered Search', () => {
         vector: vec,
         limit: 10,
         minCoreScore: 1.1, // Disable early termination
-        getMemoryById: (id) => memories.get(id),
+        getMemoryById: id => memories.get(id),
       });
 
       expect(results.length).toBe(2);
@@ -418,7 +431,7 @@ describe('Layered Search', () => {
         vector: vec,
         limit: 10,
         minCoreScore: 1.1, // Disable early termination
-        getMemoryById: (id) => memories.get(id),
+        getMemoryById: id => memories.get(id),
       });
 
       const decisionResult = results.find(r => r.id === 'decision-1');
@@ -453,7 +466,7 @@ describe('Layered Search', () => {
       const results = await layeredSearch(index, {
         vector: vec,
         limit: 10,
-        getMemoryById: (id) => memories.get(id),
+        getMemoryById: id => memories.get(id),
       });
 
       const freshResult = results.find(r => r.id === 'fresh-1');
@@ -480,7 +493,7 @@ describe('Layered Search', () => {
       const results = await layeredSearch(index, {
         vector: vec,
         limit: 10,
-        getMemoryById: (id) => memories.get(id),
+        getMemoryById: id => memories.get(id),
       });
 
       for (let i = 1; i < results.length; i++) {
@@ -509,7 +522,7 @@ describe('Layered Search', () => {
         vector: vec,
         limit: 10,
         maxLayers: 1,
-        getMemoryById: (id) => memories.get(id),
+        getMemoryById: id => memories.get(id),
       });
 
       expect(results.some(r => r.id === 'core-1')).toBe(true);
@@ -518,11 +531,13 @@ describe('Layered Search', () => {
 
     it('should respect limit parameter', async () => {
       for (let i = 0; i < 10; i++) {
-        await addMemory(makeMemory({
-          id: `core-${i}`,
-          entryType: 'preference',
-          ttl: 'permanent',
-        }));
+        await addMemory(
+          makeMemory({
+            id: `core-${i}`,
+            entryType: 'preference',
+            ttl: 'permanent',
+          })
+        );
       }
 
       const results = await layeredSearch(index, {

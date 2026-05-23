@@ -205,12 +205,12 @@ YYYY-MM-DD-title-slug.md
 ### 常用脚本
 
 ```bash
-npm run build
-npm run lint
-npm run typecheck
-npm run test
-npm run test:coverage
-npm run quality
+npx pnpm run build
+npx pnpm run lint
+npx pnpm run typecheck
+npx pnpm run test
+npx pnpm run test:coverage
+npx pnpm run quality
 ```
 
 ### 工程流程（默认）

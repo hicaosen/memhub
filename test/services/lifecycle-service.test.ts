@@ -3,7 +3,11 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { LifecycleService, DEFAULT_LIFECYCLE_CONFIG, type LifecycleAction } from '../../src/services/lifecycle-service.js';
+import {
+  LifecycleService,
+  DEFAULT_LIFECYCLE_CONFIG,
+  type LifecycleAction,
+} from '../../src/services/lifecycle-service.js';
 import type { Memory } from '../../src/contracts/types.js';
 
 function createMockMemory(overrides: Partial<Memory> = {}): Memory {

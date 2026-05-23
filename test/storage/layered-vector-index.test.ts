@@ -26,12 +26,14 @@ function randomVec(dim = VECTOR_DIM): number[] {
 
 type MemoryLayerOption = 'core' | 'journey' | 'moment';
 
-function makeMemory(overrides: {
-  entryType?: MemoryEntryType;
-  ttl?: TTLLevel;
-  id?: string;
-  expiresAt?: string;
-} = {}): Memory {
+function makeMemory(
+  overrides: {
+    entryType?: MemoryEntryType;
+    ttl?: TTLLevel;
+    id?: string;
+    expiresAt?: string;
+  } = {}
+): Memory {
   return {
     id: overrides.id ?? 'test-id-' + Math.random().toString(36).slice(2),
     createdAt: new Date().toISOString(),
@@ -49,10 +51,13 @@ function makeMemory(overrides: {
  * Create a test memory with the specified layer.
  * Auto-sets entryType and ttl based on desired layer.
  */
-function makeMemoryWithLayer(layer: MemoryLayerOption, overrides: {
-  id?: string;
-  expiresAt?: string;
-} = {}): Memory {
+function makeMemoryWithLayer(
+  layer: MemoryLayerOption,
+  overrides: {
+    id?: string;
+    expiresAt?: string;
+  } = {}
+): Memory {
   let entryType: MemoryEntryType | undefined;
   let ttl: TTLLevel | undefined;
   let expiresAt = overrides.expiresAt;
@@ -246,10 +251,7 @@ describe('LayeredVectorIndex - Phase 3', () => {
     it('respects limit parameter', async () => {
       const vec = randomVec();
       for (let i = 0; i < 10; i++) {
-        await index.upsert(
-          makeMemoryWithLayer('core', { id: `core-${i}` }),
-          vec
-        );
+        await index.upsert(makeMemoryWithLayer('core', { id: `core-${i}` }), vec);
       }
 
       const results = await index.search(vec, 5);
@@ -404,9 +406,7 @@ describe('LayeredVectorIndex - Phase 3', () => {
       const wrongDim = VECTOR_DIM === 768 ? 1024 : 768;
       const memory = makeMemoryWithLayer('core');
 
-      await expect(
-        index.upsert(memory, randomVec(wrongDim))
-      ).rejects.toThrow(
+      await expect(index.upsert(memory, randomVec(wrongDim))).rejects.toThrow(
         new RegExp(`expects ${VECTOR_DIM} dimensions, got ${wrongDim}`)
       );
     });
@@ -414,9 +414,7 @@ describe('LayeredVectorIndex - Phase 3', () => {
     it('rejects vectors with wrong dimensions on search', async () => {
       const wrongDim = VECTOR_DIM === 768 ? 1024 : 768;
 
-      await expect(
-        index.search(randomVec(wrongDim), 10)
-      ).rejects.toThrow(
+      await expect(index.search(randomVec(wrongDim), 10)).rejects.toThrow(
         new RegExp(`expects ${VECTOR_DIM} dimensions, got ${wrongDim}`)
       );
     });
@@ -424,9 +422,7 @@ describe('LayeredVectorIndex - Phase 3', () => {
     it('rejects vectors with wrong dimensions on searchByLayer', async () => {
       const wrongDim = VECTOR_DIM === 768 ? 1024 : 768;
 
-      await expect(
-        index.searchByLayer(randomVec(wrongDim), 'core', 10)
-      ).rejects.toThrow(
+      await expect(index.searchByLayer(randomVec(wrongDim), 'core', 10)).rejects.toThrow(
         new RegExp(`expects ${VECTOR_DIM} dimensions, got ${wrongDim}`)
       );
     });

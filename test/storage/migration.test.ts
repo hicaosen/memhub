@@ -67,9 +67,7 @@ describe('Migration', () => {
       const internalDir = join(tempDir, SUBDIR.internal);
       const memoriesDir = join(tempDir, SUBDIR.memories);
 
-      await expect(
-        readFile(join(internalDir), { encoding: 'utf-8' })
-      ).rejects.toThrow(); // It's a directory, not a file
+      await expect(readFile(join(internalDir), { encoding: 'utf-8' })).rejects.toThrow(); // It's a directory, not a file
 
       // Directories should exist
       const { access, constants } = await import('fs/promises');
@@ -131,16 +129,10 @@ describe('Migration', () => {
 
       expect(report.succeeded).toBe(2);
 
-      const lockContent = await readFile(
-        join(tempDir, INTERNAL_PATHS.daemonLock),
-        'utf-8'
-      );
+      const lockContent = await readFile(join(tempDir, INTERNAL_PATHS.daemonLock), 'utf-8');
       expect(lockContent).toBe('{"pid":123}');
 
-      const jsonContent = await readFile(
-        join(tempDir, INTERNAL_PATHS.daemonJson),
-        'utf-8'
-      );
+      const jsonContent = await readFile(join(tempDir, INTERNAL_PATHS.daemonJson), 'utf-8');
       expect(jsonContent).toBe('{"port":8080}');
     });
 

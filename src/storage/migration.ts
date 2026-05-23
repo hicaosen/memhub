@@ -13,12 +13,7 @@
 import { access, rename, mkdir, readdir } from 'fs/promises';
 import { join, basename } from 'path';
 import { constants } from 'fs';
-import {
-  LEGACY_PATHS,
-  INTERNAL_PATHS,
-  getInternalPath,
-  getMemoriesPath,
-} from './paths.js';
+import { LEGACY_PATHS, INTERNAL_PATHS, getInternalPath, getMemoriesPath } from './paths.js';
 import type { Logger } from '../utils/logger.js';
 
 /**

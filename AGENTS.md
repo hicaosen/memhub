@@ -13,7 +13,7 @@ MemHub is a Git-friendly memory MCP server for coding agents. It stores decision
 ```bash
 npx pnpm install        # Install dependencies
 npx pnpm run build      # Compile TypeScript
-npx pnpm run quality    # Quality gate (lint + typecheck + test + coverage)
+npx pnpm run quality    # Quality gate (lint + typecheck + format + coverage + build)
 ```
 
 | Command | Description |

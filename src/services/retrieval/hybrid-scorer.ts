@@ -77,8 +77,7 @@ export function scoreCandidate(input: ScoreCandidateInput): ScoreCandidateResult
       : 1.0;
 
   // Base score from vector/keyword hybrid
-  const baseScore =
-    input.vectorScore * weights.vector + input.keywordScore * weights.keyword;
+  const baseScore = input.vectorScore * weights.vector + input.keywordScore * weights.keyword;
 
   // Apply layer weights to base score
   const weightedScore = baseScore * layerWeight * typeWeight * freshnessFactor;

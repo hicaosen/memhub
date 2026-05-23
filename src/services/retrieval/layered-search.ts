@@ -152,11 +152,7 @@ export async function layeredSearch(
       const memory = getMemoryById(id);
       if (memory) {
         typeWeight = getTypeWeight(memory.entryType);
-        freshnessFactor = calculateFreshnessFactor(
-          memory.expiresAt,
-          memory.createdAt,
-          now
-        );
+        freshnessFactor = calculateFreshnessFactor(memory.expiresAt, memory.createdAt, now);
       }
     }
 

@@ -78,7 +78,11 @@ class LayerAwareMockVectorRetriever implements VectorRetriever {
     this.hitsByLayer = hitsByLayer;
   }
 
-  async search(input: { query: string; variants: readonly string[]; limit: number }): Promise<readonly VectorHit[]> {
+  async search(input: {
+    query: string;
+    variants: readonly string[];
+    limit: number;
+  }): Promise<readonly VectorHit[]> {
     // Return all hits (in real impl, this would be filtered by layer)
     const allHits: VectorHit[] = [];
     for (const hits of this.hitsByLayer.values()) {
